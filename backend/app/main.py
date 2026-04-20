@@ -51,13 +51,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 def list_skills(
     page: int = Query(0, ge=0),
     size: int = Query(20, ge=1, le=100),
-    tag: str = Query(None)
+    tag: str = Query(None),
+    tags: str = Query(None)
 ):
     """获取技能列表"""
     data = skills_db.read()
     skills = data.get("skills", [])
     
-    # 过滤
+    # 过滤（旧版单 tag 参数，基于版本 tag）
     if tag:
         versions_data = versions_db.read()
         latest_versions = {
@@ -65,6 +66,14 @@ def list_skills(
             if v.get("tag") == tag and v.get("is_latest")
         }
         skills = [s for s in skills if s["id"] in latest_versions]
+    
+    # 过滤（新版多 tags 参数，基于 skill.tags）
+    if tags:
+        filter_tags = [t.strip() for t in tags.split(",") if t.strip()]
+        skills = [
+            s for s in skills
+            if any(t in (s.get("tags") or []) for t in filter_tags)
+        ]
     
     # 排序（按创建时间倒序）
     skills.sort(key=lambda x: x.get("created_at", ""), reverse=True)
@@ -120,7 +129,8 @@ async def create_skill(
     tag: str = Form("stable"),
     authorEmployeeId: str = Form(""),
     authorDepartment: str = Form(""),
-    authorOrganization: str = Form("")
+    authorOrganization: str = Form(""),
+    tags: str = Form("")
 ):
     """发布新技能"""
     """发布新技能"""
@@ -168,6 +178,9 @@ async def create_skill(
         
         # 创建记录
         now = datetime.now().isoformat()
+        # 解析 tags
+        skill_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+        
         skill_record = {
             "id": skill_id,
             "name": skill_info["name"],
@@ -179,6 +192,7 @@ async def create_skill(
             "author_employee_id": authorEmployeeId,
             "author_department": authorDepartment,
             "author_organization": authorOrganization,
+            "tags": skill_tags,
             "admin_key_hash": "",
             "download_count": 0,
             "latest_version": version,
@@ -381,6 +395,51 @@ async def create_version(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.put("/api/skills/{slug}")
+async def update_skill(
+    slug: str,
+    name: str = Form(...),
+    description: str = Form(""),
+    authorName: str = Form(...),
+    authorEmail: str = Form(""),
+    authorEmployeeId: str = Form(""),
+    authorDepartment: str = Form(""),
+    authorOrganization: str = Form(""),
+    tags: str = Form("")
+):
+    """更新技能信息"""
+    skills_data = skills_db.read()
+    skill = next(
+        (s for s in skills_data.get("skills", []) if s["slug"] == slug),
+        None
+    )
+    
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill not found")
+    
+    skill_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+    now = datetime.now().isoformat()
+    
+    def update_data(data):
+        for s in data.get("skills", []):
+            if s["slug"] == slug:
+                s["name"] = name
+                s["description"] = description
+                s["author_name"] = authorName
+                s["author_email"] = authorEmail
+                s["author_employee_id"] = authorEmployeeId
+                s["author_department"] = authorDepartment
+                s["author_organization"] = authorOrganization
+                s["tags"] = skill_tags
+                s["updated_at"] = now
+                break
+    
+    skills_db.update(update_data)
+    update_search_index(skill)
+    
+    return {"success": True, "message": "Skill updated"}
+
+
 @app.delete("/api/skills/{slug}")
 def delete_skill_endpoint(slug: str):
     """删除技能（无限制）"""
@@ -410,6 +469,28 @@ def search(q: str = Query(..., min_length=1)):
             "content": results,
             "totalElements": len(results)
         }
+    }
+
+
+@app.get("/api/skills-summary")
+def skills_summary():
+    """返回所有技能的摘要信息（名称、简介、下载链接、开发人）"""
+    data = skills_db.read()
+    skills = data.get("skills", [])
+    
+    results = [
+        {
+            "name": s.get("name", ""),
+            "description": s.get("description", ""),
+            "downloadUrl": f"/api/skills/{s['slug']}/download",
+            "developer": s.get("author_name", "")
+        }
+        for s in skills
+    ]
+    
+    return {
+        "success": True,
+        "data": results
     }
 
 

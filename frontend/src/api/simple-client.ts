@@ -15,6 +15,7 @@ export interface Skill {
   admin_key_hash?: string;
   download_count: number;
   latest_version: string;
+  tags?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -53,12 +54,14 @@ export interface ApiResponse<T> {
 export async function getSkills(params?: { 
   page?: number; 
   size?: number; 
-  tag?: string 
+  tag?: string;
+  tags?: string;
 }): Promise<ApiResponse<PageResponse<Skill>>> {
   const query = new URLSearchParams();
   if (params?.page !== undefined) query.set('page', String(params.page));
   if (params?.size !== undefined) query.set('size', String(params.size));
   if (params?.tag) query.set('tag', params.tag);
+  if (params?.tags) query.set('tags', params.tags);
   
   const response = await fetch(`${API_BASE}/skills?${query}`);
   if (!response.ok) throw new Error('Failed to fetch skills');
@@ -117,6 +120,20 @@ export async function publishVersion(
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to publish version');
+  }
+  return response.json();
+}
+
+// 更新技能信息
+export async function updateSkill(slug: string, formData: FormData): Promise<ApiResponse<{ message: string }>> {
+  const response = await fetch(`${API_BASE}/skills/${slug}`, {
+    method: 'PUT',
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to update skill');
   }
   return response.json();
 }
