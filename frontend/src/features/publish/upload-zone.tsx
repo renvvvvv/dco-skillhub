@@ -28,6 +28,10 @@ export function UploadZone({ onFileSelect, disabled }: UploadZoneProps) {
     onDrop,
     accept: {
       'application/zip': ['.zip'],
+      'application/gzip': ['.gz', '.tar.gz'],
+      'application/x-7z-compressed': ['.7z'],
+      'application/x-tar': ['.tar'],
+      'application/x-bzip2': ['.bz2'],
     },
     maxFiles: 1,
     disabled,

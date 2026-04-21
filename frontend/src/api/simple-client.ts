@@ -16,6 +16,7 @@ export interface Skill {
   download_count: number;
   latest_version: string;
   tags?: string[];
+  status?: string;
   created_at: string;
   updated_at: string;
 }
@@ -48,6 +49,24 @@ export interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
+  token?: string;
+}
+
+export interface StatsData {
+  skills: { name: string; slug: string; downloads: number; views: number }[];
+  departments: { name: string; count: number }[];
+  developers: { name: string; count: number }[];
+}
+
+export interface AuditLog {
+  id: string;
+  type: string;
+  skill_slug: string;
+  skill_name: string;
+  ip: string;
+  user: string;
+  timestamp: string;
+  detail: string;
 }
 
 // 获取技能列表
@@ -102,28 +121,6 @@ export async function publishSkill(formData: FormData): Promise<ApiResponse<{
   return response.json();
 }
 
-// 发布新版本
-export async function publishVersion(
-  slug: string, 
-  formData: FormData
-): Promise<ApiResponse<{
-  skillId: string;
-  version: string;
-  tag: string;
-  downloadUrl: string;
-}>> {
-  const response = await fetch(`${API_BASE}/skills/${slug}/versions`, {
-    method: 'POST',
-    body: formData,
-  });
-  
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || 'Failed to publish version');
-  }
-  return response.json();
-}
-
 // 更新技能信息
 export async function updateSkill(slug: string, formData: FormData): Promise<ApiResponse<{ message: string }>> {
   const response = await fetch(`${API_BASE}/skills/${slug}`, {
@@ -148,6 +145,78 @@ export async function deleteSkill(slug: string): Promise<ApiResponse<{ message: 
     const error = await response.json();
     throw new Error(error.detail || 'Failed to delete skill');
   }
+  return response.json();
+}
+
+// 记录浏览量
+export async function recordView(slug: string): Promise<ApiResponse<{ success: boolean }>> {
+  const response = await fetch(`${API_BASE}/skills/${encodeURIComponent(slug)}/view`, {
+    method: 'POST',
+  });
+  if (!response.ok) throw new Error('Failed to record view');
+  return response.json();
+}
+
+// 获取统计数据
+export async function getStats(): Promise<ApiResponse<StatsData>> {
+  const response = await fetch(`${API_BASE}/stats`);
+  if (!response.ok) throw new Error('Failed to fetch stats');
+  return response.json();
+}
+
+// 管理员登录
+export async function adminLogin(password: string): Promise<ApiResponse<{ token: string }>> {
+  const formData = new FormData();
+  formData.append('password', password);
+  const response = await fetch(`${API_BASE}/admin/login`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || '登录失败');
+  }
+  return response.json();
+}
+
+// 获取待审核列表
+export async function getPending(token: string): Promise<ApiResponse<{ skills: Skill[]; versions: any[] }>> {
+  const response = await fetch(`${API_BASE}/admin/pending`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to fetch pending');
+  return response.json();
+}
+
+// 审核操作
+export async function approveSkill(token: string, slug: string, action: 'approve' | 'reject' | 'delete', reason?: string): Promise<ApiResponse<{ message: string }>> {
+  const formData = new FormData();
+  formData.append('slug', slug);
+  formData.append('action', action);
+  if (reason) formData.append('reason', reason);
+  const response = await fetch(`${API_BASE}/admin/approve`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || '审核失败');
+  }
+  return response.json();
+}
+
+// 获取审计日志
+export async function getAuditLogs(token: string, params?: { type?: string; page?: number; size?: number }): Promise<ApiResponse<PageResponse<AuditLog>>> {
+  const query = new URLSearchParams();
+  if (params?.type) query.set('type', params.type);
+  if (params?.page !== undefined) query.set('page', String(params.page));
+  if (params?.size !== undefined) query.set('size', String(params.size));
+  
+  const response = await fetch(`${API_BASE}/admin/logs?${query}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to fetch logs');
   return response.json();
 }
 

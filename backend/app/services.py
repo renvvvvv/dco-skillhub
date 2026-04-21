@@ -1,12 +1,21 @@
 """业务逻辑服务"""
 import hashlib
 import zipfile
+import tarfile
 import re
 import shutil
+import io
 from pathlib import Path
 from datetime import datetime
 from typing import List, Optional
 from app.config import STORAGE_DIR
+
+# 尝试导入 py7zr，未安装则跳过
+try:
+    import py7zr
+    HAS_PY7ZR = True
+except ImportError:
+    HAS_PY7ZR = False
 from app.database import skills_db, versions_db, search_db
 
 
@@ -27,80 +36,99 @@ def verify_admin_key(skill_id: str, provided_key: str) -> bool:
     return skill.get("admin_key_hash") == hash_admin_key(provided_key)
 
 
-def extract_skill_md(zip_path: Path) -> dict:
-    """从 ZIP 中提取并解析 skill.md"""
-    with zipfile.ZipFile(zip_path, 'r') as zf:
-        # 查找 skill.md（不区分大小写）
-        skill_md_files = [
-            f for f in zf.namelist()
-            if f.lower().endswith('skill.md')
-        ]
+def _parse_skill_md(content: str) -> dict:
+    """解析 skill.md 内容"""
+    content = content.lstrip('\ufeff')
+    name = None
+    description = None
+    readme_content = content
+    lines = content.split('\n')
+    
+    if lines and lines[0].strip() == '---':
+        end_idx = -1
+        yaml_lines = []
+        for i, line in enumerate(lines[1:], start=1):
+            if line.strip() == '---':
+                end_idx = i
+                break
+            yaml_lines.append(line)
         
-        if not skill_md_files:
-            raise ValueError("ZIP 中未找到 skill.md 文件")
-        
-        # 读取内容
-        content = zf.read(skill_md_files[0]).decode('utf-8')
-        
-        # 移除 BOM 字符（如果有）
-        content = content.lstrip('\ufeff')
-        
-        # 尝试解析 YAML frontmatter 格式
-        # 格式: ---\nname: xxx\ndescription: xxx\n---\nreadme content
-        name = None
-        description = None
-        readme_content = content
-        
-        lines = content.split('\n')
-        
-        # 检查是否是 YAML frontmatter 格式
-        if lines and lines[0].strip() == '---':
-            # 找到第二个 ---
-            end_idx = -1
-            yaml_lines = []
-            
-            for i, line in enumerate(lines[1:], start=1):
-                if line.strip() == '---':
-                    end_idx = i
-                    break
-                yaml_lines.append(line)
-            
-            if end_idx > 0:
-                # 解析 YAML
-                for line in yaml_lines:
-                    if ':' in line:
-                        key, value = line.split(':', 1)
-                        key = key.strip()
-                        value = value.strip().strip('"').strip("'")
-                        if key == 'name':
-                            name = value
-                        elif key == 'description':
-                            description = value
-                
-                # readme 内容是 YAML 之后的内容
-                readme_lines = lines[end_idx + 1:]
-                readme_content = '\n'.join(readme_lines).strip()
-        
-        # 如果不是 YAML 格式，使用旧的方式解析
-        if not name:
-            # 第一行是标题
-            name = lines[0].lstrip('#').strip() if lines else "Unknown"
-        
-        if not description:
-            # 描述取前 200 字符
-            description = '\n'.join(lines[1:]).strip() if len(lines) > 1 else ""
-        
-        description = description[:200]
-        
-        # 确保 name 不为空（避免生成空 slug）
-        if not name or name == '---':
-            name = "Unnamed Skill"
-        
-        return {
-            "name": name,
-            "description": description,
-            "readme_content": readme_content or content
-        }
+        if end_idx > 0:
+            for line in yaml_lines:
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    if key == 'name':
+                        name = value
+                    elif key == 'description':
+                        description = value
+            readme_lines = lines[end_idx + 1:]
+            readme_content = '\n'.join(readme_lines).strip()
+    
+    if not name:
+        name = lines[0].lstrip('#').strip() if lines else "Unknown"
+    if not description:
+        description = '\n'.join(lines[1:]).strip() if len(lines) > 1 else ""
+    description = description[:200]
+    if not name or name == '---':
+        name = "Unnamed Skill"
+    
+    return {
+        "name": name,
+        "description": description,
+        "readme_content": readme_content or content
+    }
+
+
+def _find_skill_md_in_list(names: list) -> str:
+    """从文件列表中查找 skill.md"""
+    for name in names:
+        if name.lower().endswith('skill.md'):
+            return name
+    return ""
+
+
+def extract_skill_md(archive_path: Path) -> dict:
+    """从压缩包中提取并解析 skill.md，支持 zip/tar.gz/7z"""
+    content = None
+    suffix = archive_path.suffix.lower()
+    name_lower = archive_path.name.lower()
+    
+    # ZIP
+    if suffix == '.zip' or zipfile.is_zipfile(archive_path):
+        with zipfile.ZipFile(archive_path, 'r') as zf:
+            md_file = _find_skill_md_in_list(zf.namelist())
+            if not md_file:
+                raise ValueError("压缩包中未找到 skill.md 文件")
+            content = zf.read(md_file).decode('utf-8')
+    
+    # TAR.GZ / TAR.BZ2 / TAR.XZ
+    elif suffix in ('.gz', '.bz2', '.xz', '.tar') or tarfile.is_tarfile(archive_path):
+        with tarfile.open(archive_path, 'r:*') as tf:
+            md_file = _find_skill_md_in_list(tf.getnames())
+            if not md_file:
+                raise ValueError("压缩包中未找到 skill.md 文件")
+            member = tf.getmember(md_file)
+            f = tf.extractfile(member)
+            if f:
+                content = f.read().decode('utf-8')
+    
+    # 7Z
+    elif suffix == '.7z' and HAS_PY7ZR:
+        with py7zr.SevenZipFile(archive_path, 'r') as zf:
+            names = zf.getnames()
+            md_file = _find_skill_md_in_list(names)
+            if not md_file:
+                raise ValueError("压缩包中未找到 skill.md 文件")
+            data = zf.read([md_file])
+            if md_file in data:
+                content = data[md_file].read().decode('utf-8')
+    
+    if content is None:
+        raise ValueError("不支持的压缩包格式，请使用 zip/tar.gz/7z")
+    
+    return _parse_skill_md(content)
 
 
 def generate_slug(name: str) -> str:

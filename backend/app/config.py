@@ -14,6 +14,9 @@ STORAGE_DIR.mkdir(exist_ok=True)
 SKILLS_FILE = DATA_DIR / "skills.json"
 VERSIONS_FILE = DATA_DIR / "versions.json"
 SEARCH_INDEX_FILE = DATA_DIR / "search_index.json"
+VIEWS_FILE = DATA_DIR / "views.json"
+VIEW_RECORDS_FILE = DATA_DIR / "view_records.json"
+AUDIT_LOGS_FILE = DATA_DIR / "audit_logs.json"
 
 # 应用配置
 APP_NAME = "SkillHub Lite"
