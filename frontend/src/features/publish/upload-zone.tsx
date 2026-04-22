@@ -32,6 +32,8 @@ export function UploadZone({ onFileSelect, disabled }: UploadZoneProps) {
       'application/x-7z-compressed': ['.7z'],
       'application/x-tar': ['.tar'],
       'application/x-bzip2': ['.bz2'],
+      'application/vnd.rar': ['.rar'],
+      'application/x-rar-compressed': ['.rar'],
     },
     maxFiles: 1,
     disabled,

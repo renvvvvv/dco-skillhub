@@ -16,6 +16,13 @@ try:
     HAS_PY7ZR = True
 except ImportError:
     HAS_PY7ZR = False
+
+# 尝试导入 rarfile，未安装则跳过
+try:
+    import rarfile
+    HAS_RARFILE = True
+except ImportError:
+    HAS_RARFILE = False
 from app.database import skills_db, versions_db, search_db
 
 
@@ -125,8 +132,16 @@ def extract_skill_md(archive_path: Path) -> dict:
             if md_file in data:
                 content = data[md_file].read().decode('utf-8')
     
+    # RAR
+    elif suffix == '.rar' and HAS_RARFILE:
+        with rarfile.RarFile(archive_path, 'r') as rf:
+            md_file = _find_skill_md_in_list(rf.namelist())
+            if not md_file:
+                raise ValueError("压缩包中未找到 skill.md 文件")
+            content = rf.read(md_file).decode('utf-8')
+    
     if content is None:
-        raise ValueError("不支持的压缩包格式，请使用 zip/tar.gz/7z")
+        raise ValueError("不支持的压缩包格式，请使用 zip/tar.gz/7z/rar")
     
     return _parse_skill_md(content)
 

@@ -161,7 +161,7 @@ def get_skill(slug: str):
     }
 
 
-ALLOWED_ARCHIVE_EXTS = ('.zip', '.gz', '.bz2', '.xz', '.tar', '.7z')
+ALLOWED_ARCHIVE_EXTS = ('.zip', '.gz', '.bz2', '.xz', '.tar', '.7z', '.rar')
 
 @app.post("/api/skills/parse")
 async def parse_skill_zip(skillZip: UploadFile = File(...)):

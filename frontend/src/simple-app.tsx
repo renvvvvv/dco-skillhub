@@ -591,7 +591,7 @@ function 更新Dialog({ skill, isOpen, onClose, onSuccess }: {
           <p className="text-sm text-gray-500 mt-1">{skill.name}</p>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div><Label>New 版本号 Package (ZIP/TAR.GZ/7Z)</Label><div className="mt-2"><UploadZone onFileSelect={setFile} />{file && <p className="mt-2 text-sm text-green-600">已选择: {file.name}</p>}</div></div>
+          <div><Label>New 版本号 Package (ZIP/TAR.GZ/7Z/RAR)</Label><div className="mt-2"><UploadZone onFileSelect={setFile} />{file && <p className="mt-2 text-sm text-green-600">已选择: {file.name}</p>}</div></div>
           <div><Label htmlFor="update版本号">版本号</Label><Input id="update版本号" value={version} onChange={(e) => set版本号(e.target.value)} placeholder="例如: 1.1.0" required /></div>
           <div><Label htmlFor="update标签">标签</Label><select id="update标签" value={tag} onChange={(e) => set标签(e.target.value)} className="w-full border rounded-lg px-3 py-2"><option value="稳定版">Stable</option><option value="测试版">Beta</option></select></div>
           <div className="flex gap-3 pt-4"><Button type="button" variant="outline" onClick={onClose} className="flex-1">取消</Button><Button type="submit" disabled={isSubmitting} className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500">{isSubmitting ? '更新中...' : 'Confirm 更新'}</Button></div>
@@ -1016,7 +1016,7 @@ function 发布View({ onSuccess }: { onSuccess: () => void }) {
       <CardHeader><CardTitle>发布 New Skill</CardTitle></CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div><Label>技能包 (ZIP/TAR.GZ/7Z)</Label><div className="mt-2"><UploadZone onFileSelect={(f) => { setFile(f); if (f) parseZip(f) }} />{file && <p className="mt-2 text-sm text-green-600">已选择: {file.name}</p>}</div></div>
+          <div><Label>技能包 (ZIP/TAR.GZ/7Z/RAR)</Label><div className="mt-2"><UploadZone onFileSelect={(f) => { setFile(f); if (f) parseZip(f) }} />{file && <p className="mt-2 text-sm text-green-600">已选择: {file.name}</p>}</div></div>
           
           <div className="space-y-4 border border-gray-200 rounded-lg p-4 bg-gray-50/50">
             <h3 className="font-medium text-gray-900">技能信息</h3>
