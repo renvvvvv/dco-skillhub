@@ -18,6 +18,49 @@ const TAG_COLORS: Record<string, string> = {
   '市场营销': 'bg-red-100 text-red-700',
 }
 
+// 二级标签配置
+const SUB_TAGS: Record<string, string[]> = {
+  '技术开发': ['智航开发', '飞书开发', 'MCP开发', 'Agent开发', '自动化开发', '通用开发'],
+  '数据分析': ['运维数据', '业务数据', '用户分析', '成本分析', '预测分析'],
+  '产品设计': ['UI设计', '原型设计', '交互设计', '设计规范'],
+  '运维支撑': ['智航运维', '飞书运维', '监控告警', '故障处理', '容量管理', '变更管理'],
+  '项目管理': ['需求管理', '进度跟踪', '风险管控', '资源协调', '敏捷实践'],
+  '市场营销': ['内容运营', '活动策划', '用户增长', '竞品分析', '品牌传播'],
+}
+const SUB_TAG_COLORS: Record<string, string> = {
+  '智航开发': 'bg-blue-50 text-blue-600',
+  '飞书开发': 'bg-blue-50 text-blue-600',
+  'MCP开发': 'bg-blue-50 text-blue-600',
+  'Agent开发': 'bg-blue-50 text-blue-600',
+  '自动化开发': 'bg-blue-50 text-blue-600',
+  '通用开发': 'bg-blue-50 text-blue-600',
+  '运维数据': 'bg-purple-50 text-purple-600',
+  '业务数据': 'bg-purple-50 text-purple-600',
+  '用户分析': 'bg-purple-50 text-purple-600',
+  '成本分析': 'bg-purple-50 text-purple-600',
+  '预测分析': 'bg-purple-50 text-purple-600',
+  'UI设计': 'bg-pink-50 text-pink-600',
+  '原型设计': 'bg-pink-50 text-pink-600',
+  '交互设计': 'bg-pink-50 text-pink-600',
+  '设计规范': 'bg-pink-50 text-pink-600',
+  '智航运维': 'bg-green-50 text-green-600',
+  '飞书运维': 'bg-green-50 text-green-600',
+  '监控告警': 'bg-green-50 text-green-600',
+  '故障处理': 'bg-green-50 text-green-600',
+  '容量管理': 'bg-green-50 text-green-600',
+  '变更管理': 'bg-green-50 text-green-600',
+  '需求管理': 'bg-orange-50 text-orange-600',
+  '进度跟踪': 'bg-orange-50 text-orange-600',
+  '风险管控': 'bg-orange-50 text-orange-600',
+  '资源协调': 'bg-orange-50 text-orange-600',
+  '敏捷实践': 'bg-orange-50 text-orange-600',
+  '内容运营': 'bg-red-50 text-red-600',
+  '活动策划': 'bg-red-50 text-red-600',
+  '用户增长': 'bg-red-50 text-red-600',
+  '竞品分析': 'bg-red-50 text-red-600',
+  '品牌传播': 'bg-red-50 text-red-600',
+}
+
 const STATS_COLORS = ['from-pink-500 to-rose-500', 'from-purple-500 to-indigo-500', 'from-blue-500 to-cyan-500', 'from-emerald-500 to-teal-500', 'from-orange-500 to-amber-500', 'from-red-500 to-pink-500']
 
 const LOG_TYPE_COLORS: Record<string, string> = {
@@ -35,34 +78,86 @@ const LOG_TYPE_LABELS: Record<string, string> = {
   'view': '浏览', 'download': '下载', 'publish': '发布', 'update': '更新', 'approve': '通过', 'reject': '拒绝', 'delete_pending': '删除申请', 'delete': '删除',
 }
 
-// 标签多选组件
+// 二级标签多选组件
 function TagMultiSelect({ value, onChange }: { value: string[]; onChange: (tags: string[]) => void }) {
+  const [selectedParents, setSelectedParents] = useState<string[]>([])
+  
+  // 同步外部value变化到selectedParents
+  useEffect(() => {
+    const parents = SKILL_TAGS.filter(p => value.some(t => (SUB_TAGS[p] || []).includes(t)))
+    setSelectedParents(parents)
+  }, [value])
+  
+  function toggleParent(parent: string) {
+    const next = selectedParents.includes(parent) 
+      ? selectedParents.filter(p => p !== parent)
+      : [...selectedParents, parent]
+    setSelectedParents(next)
+    // 清除该父标签下已选的子标签
+    if (selectedParents.includes(parent)) {
+      const subTags = SUB_TAGS[parent] || []
+      onChange(value.filter(t => !subTags.includes(t)))
+    }
+  }
+  
+  function toggleSubTag(_parent: string, subTag: string) {
+    const selected = value.includes(subTag)
+    const next = selected ? value.filter(t => t !== subTag) : [...value, subTag]
+    onChange(next)
+  }
+  
   return (
-    <div className="flex flex-wrap gap-2">
-      {SKILL_TAGS.map(tag => {
-        const selected = value.includes(tag)
-        return (
-          <button
-            key={tag}
-            type="button"
-            onClick={() => onChange(selected ? value.filter(t => t !== tag) : [...value, tag])}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${selected ? `${TAG_COLORS[tag]} border-transparent` : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
-          >
-            {selected && <span className="mr-1">✓</span>}{tag}
-          </button>
-        )
-      })}
+    <div className="space-y-3">
+      {/* 一级标签 */}
+      <div className="flex flex-wrap gap-2">
+        {SKILL_TAGS.map(tag => {
+          const selected = selectedParents.includes(tag)
+          return (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => toggleParent(tag)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${selected ? `${TAG_COLORS[tag]} border-transparent` : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+            >
+              {selected && <span className="mr-1">✓</span>}{tag}
+            </button>
+          )
+        })}
+      </div>
+      {/* 二级标签 */}
+      {selectedParents.length > 0 && (
+        <div className="flex flex-wrap gap-2 pl-4 border-l-2 border-gray-200">
+          {selectedParents.map(parent => (
+            <div key={parent} className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-gray-400 font-medium mr-1">{parent}:</span>
+              {(SUB_TAGS[parent] || []).map(subTag => {
+                const selected = value.includes(subTag)
+                return (
+                  <button
+                    key={subTag}
+                    type="button"
+                    onClick={() => toggleSubTag(parent, subTag)}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${selected ? `${SUB_TAG_COLORS[subTag] || 'bg-gray-100 text-gray-700'} border-transparent` : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
+                  >
+                    {selected && <span className="mr-0.5">✓</span>}{subTag}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-// 标签展示组件
+// 标签展示组件（支持一级和二级标签）
 function TagDisplay({ tags }: { tags?: string[] }) {
   if (!tags || tags.length === 0) return null
   return (
     <div className="flex flex-wrap gap-2">
       {tags.map(tag => (
-        <span key={tag} className={`px-2.5 py-1 rounded-full text-xs font-medium ${TAG_COLORS[tag] || 'bg-gray-100 text-gray-600'}`}>{tag}</span>
+        <span key={tag} className={`px-2.5 py-1 rounded-full text-xs font-medium ${TAG_COLORS[tag] || SUB_TAG_COLORS[tag] || 'bg-gray-100 text-gray-600'}`}>{tag}</span>
       ))}
     </div>
   )
@@ -644,6 +739,7 @@ export function SimpleApp() {
   const [is更新DialogOpen, setIs更新DialogOpen] = useState(false)
   const [is编辑DialogOpen, setIs编辑DialogOpen] = useState(false)
   const [activeTags, setActiveTags] = useState<string[]>([])
+  const [activeSubTags, setActiveSubTags] = useState<string[]>([])
   const [adminToken, setAdminToken] = useState<string | null>(null)
   const [showAdminLogin, setShowAdminLogin] = useState(false)
 
@@ -652,7 +748,8 @@ export function SimpleApp() {
   async function loadSkills() {
     try {
       setIsLoading(true); setError(null)
-      const result = await getSkills(activeTags.length > 0 ? { tags: activeTags.join(',') } : undefined)
+      const allTags = [...activeTags, ...activeSubTags]
+      const result = await getSkills(allTags.length > 0 ? { tags: allTags.join(',') } : undefined)
       setSkills(result.data.content)
     }
     catch (err) { setError('加载失败: ' + (err as Error).message) }
@@ -665,8 +762,9 @@ export function SimpleApp() {
       setIsLoading(true)
       const result = await searchSkills(query)
       let results = result.data.content
-      if (activeTags.length > 0) {
-        results = results.filter(s => activeTags.some(t => (s.tags || []).includes(t)))
+      const allTags = [...activeTags, ...activeSubTags]
+      if (allTags.length > 0) {
+        results = results.filter(s => allTags.some(t => (s.tags || []).includes(t)))
       }
       setSkills(results)
     }
@@ -677,11 +775,21 @@ export function SimpleApp() {
   function toggleTag(tag: string) {
     const next = activeTags.includes(tag) ? activeTags.filter(t => t !== tag) : [...activeTags, tag]
     setActiveTags(next)
+    // 取消一级标签时，清除对应的二级标签
+    if (activeTags.includes(tag)) {
+      const subTagsForCategory = SUB_TAGS[tag] || []
+      setActiveSubTags(prev => prev.filter(t => !subTagsForCategory.includes(t)))
+    }
+  }
+
+  function toggleSubTag(tag: string) {
+    const next = activeSubTags.includes(tag) ? activeSubTags.filter(t => t !== tag) : [...activeSubTags, tag]
+    setActiveSubTags(next)
   }
 
   useEffect(() => {
     if (currentView === 'home') loadSkills()
-  }, [activeTags])
+  }, [activeTags, activeSubTags])
 
   async function handleSkillClick(slug: string) {
     try {
@@ -759,6 +867,7 @@ export function SimpleApp() {
               <div className="text-center py-8">
                 <h2 className="text-3xl font-bold text-gray-900 mb-4">发现与分享技能</h2>
                 <div className="max-w-2xl mx-auto"><SearchBar onSearch={handle搜索} /></div>
+                {/* 一级标签 */}
                 <div className="max-w-2xl mx-auto mt-4 flex flex-wrap justify-center gap-2">
                   {SKILL_TAGS.map(tag => (
                     <button
@@ -769,10 +878,29 @@ export function SimpleApp() {
                       {activeTags.includes(tag) && <span className="mr-1">✓</span>}{tag}
                     </button>
                   ))}
-                  {activeTags.length > 0 && (
-                    <button onClick={() => setActiveTags([])} className="px-3 py-1.5 rounded-full text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all">清除筛选</button>
+                  {(activeTags.length > 0 || activeSubTags.length > 0) && (
+                    <button onClick={() => { setActiveTags([]); setActiveSubTags([]) }} className="px-3 py-1.5 rounded-full text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all">清除全部</button>
                   )}
                 </div>
+                {/* 二级标签 */}
+                {activeTags.length > 0 && (
+                  <div className="max-w-2xl mx-auto mt-3 flex flex-wrap justify-center gap-2">
+                    {activeTags.map(parentTag => (
+                      <div key={parentTag} className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs text-gray-400 font-medium">{parentTag}:</span>
+                        {(SUB_TAGS[parentTag] || []).map(subTag => (
+                          <button
+                            key={subTag}
+                            onClick={() => toggleSubTag(subTag)}
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${activeSubTags.includes(subTag) ? `${SUB_TAG_COLORS[subTag] || 'bg-gray-100 text-gray-700'} border-transparent shadow-sm` : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
+                          >
+                            {activeSubTags.includes(subTag) && <span className="mr-0.5">✓</span>}{subTag}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               {isLoading && <div className="text-center py-12"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto"></div><p className="mt-4 text-gray-500">加载中...</p></div>}
               {error && <div className="text-center py-12"><p className="text-red-500 mb-4">{error}</p><Button onClick={loadSkills}>重试</Button></div>}
