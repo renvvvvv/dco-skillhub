@@ -745,11 +745,24 @@ export function SimpleApp() {
 
   useEffect(() => { if (currentView !== 'start') { loadSkills() } }, [currentView])
 
+  // 构建筛选用的标签列表（包含一级标签及其所有二级标签）
+  function getFilterTags() {
+    const tags = new Set<string>()
+    // 加入所有选中的二级标签
+    activeSubTags.forEach(t => tags.add(t))
+    // 对于每个选中的一级标签，加入该标签及其所有二级标签
+    activeTags.forEach(parent => {
+      tags.add(parent)
+      ;(SUB_TAGS[parent] || []).forEach(sub => tags.add(sub))
+    })
+    return Array.from(tags)
+  }
+
   async function loadSkills() {
     try {
       setIsLoading(true); setError(null)
-      const allTags = [...activeTags, ...activeSubTags]
-      const result = await getSkills(allTags.length > 0 ? { tags: allTags.join(',') } : undefined)
+      const filterTags = getFilterTags()
+      const result = await getSkills(filterTags.length > 0 ? { tags: filterTags.join(',') } : undefined)
       setSkills(result.data.content)
     }
     catch (err) { setError('加载失败: ' + (err as Error).message) }
@@ -762,9 +775,9 @@ export function SimpleApp() {
       setIsLoading(true)
       const result = await searchSkills(query)
       let results = result.data.content
-      const allTags = [...activeTags, ...activeSubTags]
-      if (allTags.length > 0) {
-        results = results.filter(s => allTags.some(t => (s.tags || []).includes(t)))
+      const filterTags = getFilterTags()
+      if (filterTags.length > 0) {
+        results = results.filter(s => filterTags.some(t => (s.tags || []).includes(t)))
       }
       setSkills(results)
     }
