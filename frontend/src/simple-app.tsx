@@ -745,12 +745,16 @@ export function SimpleApp() {
 
   useEffect(() => { if (currentView !== 'start') { loadSkills() } }, [currentView])
 
-  // 构建筛选用的标签列表（包含一级标签及其所有二级标签）
+  // 构建筛选用的标签列表
+  // 规则：如果只选了一级标签（没选其二级标签），则展示该分类下所有技能（含所有二级标签）
+  //       如果选了二级标签，则只展示该二级标签的技能
   function getFilterTags() {
+    // 如果有选中的二级标签，只用二级标签筛选（更精确）
+    if (activeSubTags.length > 0) {
+      return activeSubTags
+    }
+    // 如果只选了一级标签，展开为该分类下所有标签（一级+所有二级）
     const tags = new Set<string>()
-    // 加入所有选中的二级标签
-    activeSubTags.forEach(t => tags.add(t))
-    // 对于每个选中的一级标签，加入该标签及其所有二级标签
     activeTags.forEach(parent => {
       tags.add(parent)
       ;(SUB_TAGS[parent] || []).forEach(sub => tags.add(sub))
