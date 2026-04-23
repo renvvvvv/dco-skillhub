@@ -21,15 +21,32 @@ let cachePromise: Promise<Staff[]> | null = null;
 async function loadStaffDictionary(): Promise<Staff[]> {
   if (staffCache) return staffCache;
   if (cachePromise) return cachePromise;
-  
-  cachePromise = fetch('/staff_dictionary.json')
+
+  cachePromise = fetch('/api/staff')
     .then(res => res.json())
-    .then(data => {
+    .then(result => {
+      const data = result.data || result;
       staffCache = data;
       return data;
+    })
+    .catch(() => {
+      // 降级：尝试静态文件
+      return fetch('/staff_dictionary.json')
+        .then(res => res.json())
+        .then(data => {
+          staffCache = data;
+          return data;
+        })
+        .catch(() => []);
     });
-  
+
   return cachePromise;
+}
+
+// 刷新缓存（新增人员后调用）
+export function refreshStaffCache() {
+  staffCache = null;
+  cachePromise = null;
 }
 
 export function StaffSearchInput({ onSelect, placeholder = "搜索姓名或工号...", className = "" }: StaffSearchInputProps) {
@@ -50,13 +67,13 @@ export function StaffSearchInput({ onSelect, placeholder = "搜索姓名或工�
     setIsLoading(true);
     const staffList = await loadStaffDictionary();
     const lowerQuery = searchQuery.toLowerCase();
-    
-    const filtered = staffList.filter(staff => 
+
+    const filtered = staffList.filter(staff =>
       staff.name.toLowerCase().includes(lowerQuery) ||
       staff.employee_id.toLowerCase().includes(lowerQuery) ||
       staff.new_employee_id.toLowerCase().includes(lowerQuery)
     ).slice(0, 10); // 最多显示10条
-    
+
     setResults(filtered);
     setIsLoading(false);
   }, []);
@@ -86,6 +103,18 @@ export function StaffSearchInput({ onSelect, placeholder = "搜索姓名或工�
     setIsOpen(false);
   };
 
+  const handleUseAsNew = () => {
+    const newStaff: Staff = {
+      name: query.trim(),
+      employee_id: '',
+      new_employee_id: '',
+      department: '',
+      organization: ''
+    };
+    onSelect(newStaff);
+    setIsOpen(false);
+  };
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <input
@@ -100,13 +129,13 @@ export function StaffSearchInput({ onSelect, placeholder = "搜索姓名或工�
         placeholder={placeholder}
         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
       />
-      
+
       {isLoading && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
           <div className="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
       )}
-      
+
       {isOpen && results.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
           {results.map((staff, index) => (
@@ -129,10 +158,19 @@ export function StaffSearchInput({ onSelect, placeholder = "搜索姓名或工�
           ))}
         </div>
       )}
-      
-      {isOpen && query && results.length === 0 && !isLoading && (
+
+      {isOpen && query.trim() && results.length === 0 && !isLoading && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
-          <div className="px-4 py-3 text-gray-500 text-sm">未找到匹配的人员</div>
+          <div className="px-4 py-3 text-gray-500 text-sm border-b border-gray-100">
+            未找到匹配的人员
+          </div>
+          <button
+            type="button"
+            onClick={handleUseAsNew}
+            className="w-full px-4 py-2 text-left hover:bg-pink-50 transition-colors text-pink-600 font-medium"
+          >
+            + 使用 "{query.trim()}" 作为新人员
+          </button>
         </div>
       )}
     </div>

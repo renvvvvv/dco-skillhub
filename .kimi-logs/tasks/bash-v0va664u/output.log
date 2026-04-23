@@ -1,0 +1,20 @@
+#8 160.1 Installing collected packages: typing-extensions, six, idna, h11, click, asgiref, uvicorn, python-multipart, pydantic, anyio, starlette, fastapi
+#8 161.0 Successfully installed anyio-4.13.0 asgiref-3.11.1 click-8.3.2 fastapi-0.83.0 h11-0.16.0 idna-3.11 pydantic-1.9.2 python-multipart-0.0.5 six-1.17.0 starlette-0.19.1 typing-extensions-4.15.0 uvicorn-0.16.0
+#8 161.0 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+#8 173.4 
+#8 173.4 [notice] A new release of pip is available: 24.0 -> 26.0.1
+#8 173.4 [notice] To update, run: pip install --upgrade pip
+#8 DONE 173.8s
+
+#9 [backend 5/6] COPY app/ ./app/
+#9 DONE 0.0s
+
+#10 [backend 6/6] RUN mkdir -p data storage
+#10 DONE 0.3s
+
+#11 [backend] exporting to image
+#11 exporting layers
+#11 exporting layers 0.2s done
+#11 writing image sha256:b4318ac82568b238cfe115ce640c80075a53eaaeca00c52beb6116ebb9c7e42a done
+#11 naming to docker.io/library/doc-skillhub-backend done
+#11 DONE 0.2s

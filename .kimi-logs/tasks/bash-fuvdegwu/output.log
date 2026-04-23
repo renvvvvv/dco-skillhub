@@ -1,0 +1,6 @@
+time="2026-04-17T03:34:15Z" level=warning msg="/root/doc-skillhub/docker-compose.yml: `version` is obsolete"
+ Container doc-skillhub-backend-1  Running
+ Container doc-skillhub-nginx-1  Recreate
+ Container doc-skillhub-nginx-1  Recreated
+ Container doc-skillhub-nginx-1  Starting
+ Container doc-skillhub-nginx-1  Started

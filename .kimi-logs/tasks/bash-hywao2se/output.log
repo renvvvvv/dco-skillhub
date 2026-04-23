@@ -1,0 +1,15 @@
+#8 13.27 [notice] To update, run: pip install --upgrade pip
+#8 DONE 14.0s
+
+#9 [backend 5/6] COPY app/ ./app/
+#9 DONE 0.0s
+
+#10 [backend 6/6] RUN mkdir -p data storage
+#10 DONE 0.3s
+
+#11 [backend] exporting to image
+#11 exporting layers
+#11 exporting layers 0.3s done
+#11 writing image sha256:d9783d3834d0d6bb041009b3d4e25902f5937efbecccc1e302f7b221aec9da7b done
+#11 naming to docker.io/library/doc-skillhub-backend done
+#11 DONE 0.3s

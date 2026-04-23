@@ -7,12 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import hashlib
 import shutil
 import uuid
+import json
 from pathlib import Path
 from datetime import datetime, timedelta
 from collections import Counter
 
 from app.config import STORAGE_DIR, MAX_FILE_SIZE
-from app.database import skills_db, versions_db, views_db, view_records_db, audit_logs_db
+from app.database import skills_db, versions_db, views_db, view_records_db, audit_logs_db, staff_db
 from app.services import (
     hash_admin_key, verify_admin_key, extract_skill_md,
     generate_slug, update_search_index, search_skills,
@@ -36,6 +37,66 @@ app.add_middleware(
 
 
 ADMIN_PASSWORD_HASH = hashlib.sha256("test-key-for-dev-2026".encode()).hexdigest()
+
+
+def _ensure_staff_initialized():
+    """首次启动时，如果 staff.json 为空，从 staff_dictionary.json 导入初始数据"""
+    data = staff_db.read()
+    if data.get("staff"):
+        return
+    # 容器内路径：/app/data/staff_dictionary.json（通过 volume 挂载）
+    dict_path = Path("/app/data/staff_dictionary.json")
+    if not dict_path.exists():
+        # 本地开发路径
+        dict_path = Path(__file__).parent.parent.parent / "frontend" / "public" / "staff_dictionary.json"
+    if dict_path.exists():
+        try:
+            with open(dict_path, 'r', encoding='utf-8') as f:
+                initial_staff = json.loads(f.read())
+            if isinstance(initial_staff, list):
+                staff_db.write({"staff": initial_staff})
+        except Exception:
+            pass
+
+
+_ensure_staff_initialized()
+
+
+def _upsert_staff(name: str, employee_id: str, department: str, organization: str):
+    """新增或更新人员字典"""
+    if not name.strip():
+        return
+    def updater(data):
+        staff_list = data.get("staff", [])
+        # 按 employee_id 或 name 匹配
+        existing = None
+        for s in staff_list:
+            if employee_id and (s.get("employee_id") == employee_id or s.get("new_employee_id") == employee_id):
+                existing = s
+                break
+            if s.get("name") == name.strip():
+                existing = s
+                break
+        if existing:
+            if employee_id:
+                if not existing.get("employee_id"):
+                    existing["employee_id"] = employee_id
+                elif not existing.get("new_employee_id"):
+                    existing["new_employee_id"] = employee_id
+            if department:
+                existing["department"] = department
+            if organization:
+                existing["organization"] = organization
+        else:
+            staff_list.append({
+                "name": name.strip(),
+                "employee_id": employee_id or "",
+                "new_employee_id": "",
+                "department": department or "",
+                "organization": organization or ""
+            })
+        data["staff"] = staff_list
+    staff_db.update(updater)
 
 
 def get_client_ip(request: Request) -> str:
@@ -302,6 +363,9 @@ async def create_skill(
         # 更新搜索索引
         update_search_index(skill_record)
         
+        # 自动同步人员字典
+        _upsert_staff(authorName, authorEmployeeId, authorDepartment, authorOrganization)
+        
         # 记录日志
         add_audit_log("publish", slug, skill_info["name"], authorName, "发布新技能", request)
         
@@ -511,6 +575,9 @@ async def update_skill(
     
     skills_db.update(update_data)
     update_search_index(skill)
+    
+    # 自动同步人员字典
+    _upsert_staff(authorName, authorEmployeeId, authorDepartment, authorOrganization)
     
     return {"success": True, "message": "Skill updated"}
 
@@ -875,6 +942,28 @@ def get_logs(
             "number": page
         }
     }
+
+
+@app.get("/api/staff")
+def list_staff():
+    """获取全部人员列表"""
+    data = staff_db.read()
+    return {
+        "success": True,
+        "data": data.get("staff", [])
+    }
+
+
+@app.post("/api/staff")
+def add_staff(
+    name: str = Form(...),
+    employee_id: str = Form(""),
+    department: str = Form(""),
+    organization: str = Form("")
+):
+    """新增或更新人员"""
+    _upsert_staff(name, employee_id, department, organization)
+    return {"success": True, "message": "人员已保存"}
 
 
 @app.get("/health")

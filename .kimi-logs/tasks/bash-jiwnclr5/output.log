@@ -1,0 +1,26 @@
+time="2026-04-17T02:05:05Z" level=warning msg="/root/doc-skillhub/docker-compose.yml: `version` is obsolete"
+ Container doc-skillhub-nginx-1  Stopping
+ Container doc-skillhub-nginx-1  Stopped
+ Container doc-skillhub-nginx-1  Removing
+ Container doc-skillhub-nginx-1  Removed
+ Container doc-skillhub-backend-1  Stopping
+ Container doc-skillhub-backend-1  Stopped
+ Container doc-skillhub-backend-1  Removing
+ Container doc-skillhub-backend-1  Removed
+ Network doc-skillhub_default  Removing
+ Network doc-skillhub_default  Removed
+#8 ERROR: process "/bin/sh -c pip install --no-cache-dir -r requirements.txt" did not complete successfully: exit code: 2
+------
+ > [backend 4/6] RUN pip install --no-cache-dir -r requirements.txt:
+56.48   File "/usr/local/lib/python3.11/site-packages/pip/_vendor/urllib3/response.py", line 622, in stream
+56.48     data = self.read(amt=amt, decode_content=decode_content)
+56.48            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+56.48   File "/usr/local/lib/python3.11/site-packages/pip/_vendor/urllib3/response.py", line 560, in read
+56.48     with self._error_catcher():
+56.48   File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+56.48     self.gen.throw(typ, value, traceback)
+56.48   File "/usr/local/lib/python3.11/site-packages/pip/_vendor/urllib3/response.py", line 443, in _error_catcher
+56.48     raise ReadTimeoutError(self._pool, None, "Read timed out.")
+56.48 pip._vendor.urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='files.pythonhosted.org', port=443): Read timed out.
+------
+failed to solve: process "/bin/sh -c pip install --no-cache-dir -r requirements.txt" did not complete successfully: exit code: 2

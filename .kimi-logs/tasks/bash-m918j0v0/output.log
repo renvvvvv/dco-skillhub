@@ -1,0 +1,226 @@
+time="2026-04-17T01:58:12Z" level=warning msg="/root/doc-skillhub/docker-compose.yml: `version` is obsolete"
+#0 building with "default" instance using docker driver
+
+#1 [nginx internal] load build definition from Dockerfile
+#1 transferring dockerfile: 764B done
+#1 DONE 0.0s
+
+#2 [nginx internal] load metadata for docker.io/library/node:22-alpine
+#2 DONE 2.5s
+
+#3 [nginx internal] load metadata for docker.io/library/nginx:alpine
+#3 DONE 3.1s
+
+#4 [nginx internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [nginx internal] load build context
+#5 transferring context: 2.23MB 0.1s done
+#5 DONE 0.1s
+
+#6 [nginx build 1/7] FROM docker.io/library/node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
+#6 resolve docker.io/library/node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f 0.0s done
+#6 sha256:4cc15311d45b63612aec3e37d607941ddc636bd3ab45235d8391dc5b2b90faf4 0B / 1.26MB 0.1s
+#6 sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f 6.41kB / 6.41kB done
+#6 sha256:cb15fca92530d7ac113467696cf1001208dac49c3c64355fd1348c11a88ddf8f 1.72kB / 1.72kB done
+#6 sha256:04a4709b55a8e3d7aa9ae8f49dc4ab92863d9bed96cd09f9870984b1e77435ed 6.52kB / 6.52kB done
+#6 sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb 0B / 3.86MB 0.1s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 0B / 51.96MB 0.1s
+#6 sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb 1.05MB / 3.86MB 1.6s
+#6 sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb 2.10MB / 3.86MB 2.1s
+#6 sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb 3.15MB / 3.86MB 2.2s
+#6 sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb 3.86MB / 3.86MB 2.2s done
+#6 sha256:8bfa0019f928dcee6004de6c4b85d75774f993212504ac816ede0f3c6ae097de 0B / 445B 2.3s
+#6 extracting sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb 0.1s done
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 3.15MB / 51.96MB 2.9s
+#6 sha256:4cc15311d45b63612aec3e37d607941ddc636bd3ab45235d8391dc5b2b90faf4 1.05MB / 1.26MB 3.5s
+#6 sha256:4cc15311d45b63612aec3e37d607941ddc636bd3ab45235d8391dc5b2b90faf4 1.26MB / 1.26MB 3.6s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 6.29MB / 51.96MB 3.6s
+#6 sha256:4cc15311d45b63612aec3e37d607941ddc636bd3ab45235d8391dc5b2b90faf4 1.26MB / 1.26MB 3.6s done
+#6 sha256:8bfa0019f928dcee6004de6c4b85d75774f993212504ac816ede0f3c6ae097de 445B / 445B 4.1s done
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 10.49MB / 51.96MB 4.5s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 14.68MB / 51.96MB 5.2s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 17.83MB / 51.96MB 5.7s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 20.97MB / 51.96MB 6.4s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 25.17MB / 51.96MB 7.0s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 30.41MB / 51.96MB 7.8s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 33.55MB / 51.96MB 8.6s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 36.70MB / 51.96MB 9.2s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 39.85MB / 51.96MB 9.8s
+#6 ...
+
+#7 [nginx stage-1 1/7] FROM docker.io/library/nginx:alpine@sha256:8aa63af009a39ecd6c28d61da578a5447378c10bb097a069e3a3e0fb42bb6b19
+#7 resolve docker.io/library/nginx:alpine@sha256:8aa63af009a39ecd6c28d61da578a5447378c10bb097a069e3a3e0fb42bb6b19 0.0s done
+#7 sha256:812d47f806db497c53f9b47e76bdab38bcf5d724c69d3986df5ee4336c210559 12.32kB / 12.32kB done
+#7 sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb 3.86MB / 3.86MB 2.2s done
+#7 sha256:8aa63af009a39ecd6c28d61da578a5447378c10bb097a069e3a3e0fb42bb6b19 10.33kB / 10.33kB done
+#7 sha256:3bcf852aed06467cf075c6105892e4d5a6ebbbafa0ce22d35062db9e90ddef4c 2.50kB / 2.50kB done
+#7 sha256:82736a35d0e7f1309edc13d09115410b81542cf8b91afff80deeace02b6f2f26 1.87MB / 1.87MB 6.7s done
+#7 sha256:583599bb7d382e9e986a9ff65204981307bfa71670a29f4190eedae93c4858be 627B / 627B 6.7s done
+#7 extracting sha256:82736a35d0e7f1309edc13d09115410b81542cf8b91afff80deeace02b6f2f26 0.1s done
+#7 sha256:aee4e54b3865ee4d98545b6b49f9e8ab3b9b6ed114a2eafedc7a22e984ea5a68 956B / 956B 7.8s done
+#7 sha256:781ff50d2644f74714c0d5a4ffa3447bbfd4b293cfb1dc6a637722ae24c89241 404B / 404B 8.5s done
+#7 extracting sha256:583599bb7d382e9e986a9ff65204981307bfa71670a29f4190eedae93c4858be done
+#7 extracting sha256:aee4e54b3865ee4d98545b6b49f9e8ab3b9b6ed114a2eafedc7a22e984ea5a68 done
+#7 sha256:453da7dbc73e7338c4e201ec3f3c4a5f7751adbf5a6f127792c1cd001a780721 1.21kB / 1.21kB 8.6s done
+#7 extracting sha256:781ff50d2644f74714c0d5a4ffa3447bbfd4b293cfb1dc6a637722ae24c89241 done
+#7 sha256:4a8b0b2a5b1937755263ac7ac4ee26db2906c13a5d70f1fb1875ba8e370cdd8f 1.40kB / 1.40kB 9.3s done
+#7 extracting sha256:453da7dbc73e7338c4e201ec3f3c4a5f7751adbf5a6f127792c1cd001a780721 done
+#7 sha256:612c0c1df4c55a0bf145f84df03cb28de505e6a52fb8e49c9da7b143fc00ad2d 0B / 20.25MB 10.0s
+#7 extracting sha256:4a8b0b2a5b1937755263ac7ac4ee26db2906c13a5d70f1fb1875ba8e370cdd8f done
+#7 ...
+
+#6 [nginx build 1/7] FROM docker.io/library/node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 42.99MB / 51.96MB 10.6s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 46.14MB / 51.96MB 11.5s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 50.33MB / 51.96MB 12.4s
+#6 sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 51.96MB / 51.96MB 13.3s done
+#6 extracting sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5
+#6 extracting sha256:9e177ba73d9ff6d235c7d32bf216469630dcce0a52a6cbde08bd868b7a07e7d5 1.7s done
+#6 extracting sha256:4cc15311d45b63612aec3e37d607941ddc636bd3ab45235d8391dc5b2b90faf4 0.0s done
+#6 extracting sha256:8bfa0019f928dcee6004de6c4b85d75774f993212504ac816ede0f3c6ae097de done
+#6 DONE 15.3s
+
+#7 [nginx stage-1 1/7] FROM docker.io/library/nginx:alpine@sha256:8aa63af009a39ecd6c28d61da578a5447378c10bb097a069e3a3e0fb42bb6b19
+#7 sha256:612c0c1df4c55a0bf145f84df03cb28de505e6a52fb8e49c9da7b143fc00ad2d 20.25MB / 20.25MB 14.5s done
+#7 extracting sha256:612c0c1df4c55a0bf145f84df03cb28de505e6a52fb8e49c9da7b143fc00ad2d 0.5s done
+#7 DONE 15.2s
+
+#8 [nginx build 2/7] RUN corepack enable
+#8 DONE 0.7s
+
+#9 [nginx build 3/7] WORKDIR /app
+#9 DONE 0.0s
+
+#10 [nginx build 4/7] COPY package.json pnpm-lock.yaml ./
+#10 DONE 0.1s
+
+#11 [nginx build 5/7] RUN pnpm install --frozen-lockfile
+#11 1.261 ! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.33.0.tgz
+#11 4.739 Lockfile is up to date, resolution step is skipped
+#11 4.822 Progress: resolved 1, reused 0, downloaded 0, added 0
+#11 4.962 Packages: +480
+#11 4.962 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#11 5.824 Progress: resolved 480, reused 0, downloaded 0, added 0
+#11 6.824 Progress: resolved 480, reused 0, downloaded 4, added 4
+#11 7.825 Progress: resolved 480, reused 0, downloaded 32, added 32
+#11 8.826 Progress: resolved 480, reused 0, downloaded 55, added 52
+#11 9.827 Progress: resolved 480, reused 0, downloaded 87, added 87
+#11 10.83 Progress: resolved 480, reused 0, downloaded 134, added 132
+#11 11.83 Progress: resolved 480, reused 0, downloaded 179, added 178
+#11 12.83 Progress: resolved 480, reused 0, downloaded 217, added 217
+#11 13.83 Progress: resolved 480, reused 0, downloaded 253, added 252
+#11 14.83 Progress: resolved 480, reused 0, downloaded 296, added 296
+#11 15.83 Progress: resolved 480, reused 0, downloaded 324, added 324
+#11 16.14  WARN  Tarball download average speed 15 KiB/s (size 21 KiB) is below 50 KiB/s: https://registry.npmjs.org/doctrine/-/doctrine-3.0.0.tgz (GET)
+#11 16.83 Progress: resolved 480, reused 0, downloaded 344, added 344
+#11 17.83 Progress: resolved 480, reused 0, downloaded 354, added 354
+#11 18.10  WARN  Tarball download average speed 18 KiB/s (size 21 KiB) is below 50 KiB/s: https://registry.npmjs.org/picomatch/-/picomatch-4.0.3.tgz (GET)
+#11 18.83 Progress: resolved 480, reused 0, downloaded 373, added 373
+#11 18.92  WARN  Tarball download average speed 22 KiB/s (size 36 KiB) is below 50 KiB/s: https://registry.npmjs.org/@babel/helper-module-transforms/-/helper-module-transforms-7.28.6.tgz (GET)
+#11 19.83 Progress: resolved 480, reused 0, downloaded 385, added 385
+#11 20.31  WARN  Tarball download average speed 45 KiB/s (size 184 KiB) is below 50 KiB/s: https://registry.npmjs.org/@babel/helpers/-/helpers-7.28.6.tgz (GET)
+#11 20.83 Progress: resolved 480, reused 0, downloaded 409, added 409
+#11 21.83 Progress: resolved 480, reused 0, downloaded 429, added 429
+#11 22.74  WARN  Tarball download average speed 43 KiB/s (size 43 KiB) is below 50 KiB/s: https://registry.npmjs.org/@vitest/utils/-/utils-3.2.4.tgz (GET)
+#11 22.84 Progress: resolved 480, reused 0, downloaded 456, added 456
+#11 23.83 Progress: resolved 480, reused 0, downloaded 474, added 474
+#11 24.44  WARN  Tarball download average speed 33 KiB/s (size 294 KiB) is below 50 KiB/s: https://registry.npmjs.org/@babel/types/-/types-7.29.0.tgz (GET)
+#11 24.46  WARN  Tarball download average speed 29 KiB/s (size 65 KiB) is below 50 KiB/s: https://registry.npmjs.org/vite-node/-/vite-node-3.2.4.tgz (GET)
+#11 24.83 Progress: resolved 480, reused 0, downloaded 478, added 478
+#11 28.79 Progress: resolved 480, reused 0, downloaded 479, added 478
+#11 29.78 Progress: resolved 480, reused 0, downloaded 480, added 480, done
+#11 30.17 
+#11 30.17 dependencies:
+#11 30.17 + @radix-ui/react-dropdown-menu 2.1.16
+#11 30.17 + @radix-ui/react-select 2.2.6
+#11 30.17 + @tanstack/react-query 5.90.21
+#11 30.17 + @tanstack/react-router 1.166.7
+#11 30.17 + class-variance-authority 0.7.1
+#11 30.17 + clsx 2.1.1
+#11 30.17 + i18next 25.8.18
+#11 30.17 + i18next-browser-languagedetector 8.2.1
+#11 30.17 + lowlight 3.3.0
+#11 30.17 + lucide-react 0.344.0
+#11 30.17 + openapi-fetch 0.13.8
+#11 30.17 + react 19.2.4
+#11 30.17 + react-dom 19.2.4
+#11 30.17 + react-dropzone 15.0.0
+#11 30.17 + react-i18next 16.5.8
+#11 30.17 + react-markdown 10.1.0
+#11 30.17 + rehype-highlight 7.0.2
+#11 30.17 + rehype-sanitize 6.0.0
+#11 30.17 + remark-frontmatter 5.0.0
+#11 30.17 + remark-gfm 4.0.1
+#11 30.17 + sonner 2.0.7
+#11 30.17 + tailwind-merge 2.6.1
+#11 30.17 + unist-util-visit 5.1.0
+#11 30.17 + zustand 5.0.11
+#11 30.17 
+#11 30.17 devDependencies:
+#11 30.17 + @playwright/test 1.58.2
+#11 30.17 + @types/mdast 4.0.4
+#11 30.17 + @types/react 19.2.14
+#11 30.17 + @types/react-dom 19.2.3
+#11 30.17 + @typescript-eslint/eslint-plugin 7.18.0
+#11 30.17 + @typescript-eslint/parser 7.18.0
+#11 30.17 + @vitejs/plugin-react 4.7.0
+#11 30.17 + autoprefixer 10.4.27
+#11 30.17 + eslint 8.57.1
+#11 30.17 + eslint-plugin-react-hooks 4.6.2
+#11 30.17 + eslint-plugin-react-refresh 0.4.26
+#11 30.17 + openapi-typescript 7.13.0
+#11 30.17 + postcss 8.5.8
+#11 30.17 + tailwindcss 3.4.19
+#11 30.17 + typescript 5.9.3
+#11 30.17 + vite 6.4.1
+#11 30.17 + vitest 3.2.4
+#11 30.17 
+#11 30.20 ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+#11 30.20 │                                                                              │
+#11 30.20 │   Ignored build scripts: esbuild@0.25.12.                                    │
+#11 30.20 │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+#11 30.20 │   to run scripts.                                                            │
+#11 30.20 │                                                                              │
+#11 30.20 ╰──────────────────────────────────────────────────────────────────────────────╯
+#11 30.23 Done in 26.2s using pnpm v10.33.0
+#11 DONE 30.5s
+
+#12 [nginx build 6/7] COPY . .
+#12 DONE 0.1s
+
+#13 [nginx build 7/7] RUN pnpm build
+#13 0.850 
+#13 0.850 > skillhub-web@0.1.0 build /app
+#13 0.850 > tsc -b && vite build
+#13 0.850 
+#13 16.90 src/i18n/config.ts(16,5): error TS2769: No overload matches this call.
+#13 16.90   Overload 1 of 2, '(callback?: Callback | undefined): Promise<TFunction<"translation", undefined>>', gave the following error.
+#13 16.90     Object literal may only specify known properties, and 'resources' does not exist in type 'Callback'.
+#13 16.90 src/i18n/landing-quick-start-locale.test.ts(7,12): error TS18046: 'zh' is of type 'unknown'.
+#13 16.90 src/i18n/landing-quick-start-locale.test.ts(8,12): error TS18046: 'en' is of type 'unknown'.
+#13 16.90 src/i18n/landing-quick-start-locale.test.ts(12,12): error TS18046: 'zh' is of type 'unknown'.
+#13 16.90 src/i18n/landing-quick-start-locale.test.ts(13,12): error TS18046: 'en' is of type 'unknown'.
+#13 16.90 src/i18n/security-audit-locale.test.ts(7,12): error TS18046: 'zh' is of type 'unknown'.
+#13 16.90 src/i18n/security-audit-locale.test.ts(8,12): error TS18046: 'en' is of type 'unknown'.
+#13 16.90 src/i18n/security-audit-locale.test.ts(12,12): error TS18046: 'zh' is of type 'unknown'.
+#13 16.90 src/i18n/security-audit-locale.test.ts(13,12): error TS18046: 'en' is of type 'unknown'.
+#13 16.90 src/i18n/skill-detail-locale.test.ts(7,12): error TS18046: 'zh' is of type 'unknown'.
+#13 16.90 src/i18n/skill-detail-locale.test.ts(8,12): error TS18046: 'en' is of type 'unknown'.
+#13 16.98  ELIFECYCLE  Command failed with exit code 1.
+#13 ERROR: process "/bin/sh -c pnpm build" did not complete successfully: exit code: 1
+------
+ > [nginx build 7/7] RUN pnpm build:
+16.90 src/i18n/landing-quick-start-locale.test.ts(8,12): error TS18046: 'en' is of type 'unknown'.
+16.90 src/i18n/landing-quick-start-locale.test.ts(12,12): error TS18046: 'zh' is of type 'unknown'.
+16.90 src/i18n/landing-quick-start-locale.test.ts(13,12): error TS18046: 'en' is of type 'unknown'.
+16.90 src/i18n/security-audit-locale.test.ts(7,12): error TS18046: 'zh' is of type 'unknown'.
+16.90 src/i18n/security-audit-locale.test.ts(8,12): error TS18046: 'en' is of type 'unknown'.
+16.90 src/i18n/security-audit-locale.test.ts(12,12): error TS18046: 'zh' is of type 'unknown'.
+16.90 src/i18n/security-audit-locale.test.ts(13,12): error TS18046: 'en' is of type 'unknown'.
+16.90 src/i18n/skill-detail-locale.test.ts(7,12): error TS18046: 'zh' is of type 'unknown'.
+16.90 src/i18n/skill-detail-locale.test.ts(8,12): error TS18046: 'en' is of type 'unknown'.
+16.98  ELIFECYCLE  Command failed with exit code 1.
+------
+failed to solve: process "/bin/sh -c pnpm build" did not complete successfully: exit code: 1

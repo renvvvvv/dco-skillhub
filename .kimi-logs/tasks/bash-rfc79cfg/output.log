@@ -1,0 +1,43 @@
+time="2026-04-17T01:33:16Z" level=warning msg="/root/doc-skillhub/docker-compose.yml: `version` is obsolete"
+#0 building with "default" instance using docker driver
+
+#1 [backend internal] load build definition from Dockerfile
+#1 transferring dockerfile: 378B done
+#1 DONE 0.0s
+
+#2 [backend internal] load metadata for docker.io/library/python:3.11-slim
+#2 DONE 0.3s
+
+#3 [backend internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [backend 1/6] FROM docker.io/library/python:3.11-slim@sha256:233de06753d30d120b1a3ce359d8d3be8bda78524cd8f520c99883bfe33964cf
+#4 DONE 0.0s
+
+#5 [backend internal] load build context
+#5 transferring context: 380B done
+#5 DONE 0.0s
+
+#6 [backend 2/6] WORKDIR /app
+#6 CACHED
+
+#7 [backend 3/6] COPY requirements.txt .
+#7 DONE 0.0s
+
+#8 [backend 4/6] RUN pip install --no-cache-dir -r requirements.txt
+#8 20.36 ERROR: Could not find a version that satisfies the requirement fastapi==0.104.1 (from versions: none)
+#8 20.36 ERROR: No matching distribution found for fastapi==0.104.1
+#8 25.11 
+#8 25.11 [notice] A new release of pip is available: 24.0 -> 26.0.1
+#8 25.11 [notice] To update, run: pip install --upgrade pip
+#8 ERROR: process "/bin/sh -c pip install --no-cache-dir -r requirements.txt" did not complete successfully: exit code: 1
+------
+ > [backend 4/6] RUN pip install --no-cache-dir -r requirements.txt:
+20.36 ERROR: Could not find a version that satisfies the requirement fastapi==0.104.1 (from versions: none)
+20.36 ERROR: No matching distribution found for fastapi==0.104.1
+25.11 
+25.11 [notice] A new release of pip is available: 24.0 -> 26.0.1
+25.11 [notice] To update, run: pip install --upgrade pip
+------
+failed to solve: process "/bin/sh -c pip install --no-cache-dir -r requirements.txt" did not complete successfully: exit code: 1

@@ -5,6 +5,9 @@ import tarfile
 import re
 import shutil
 import io
+import subprocess
+import tempfile
+import os
 from pathlib import Path
 from datetime import datetime
 from typing import List, Optional
@@ -17,12 +20,16 @@ try:
 except ImportError:
     HAS_PY7ZR = False
 
-# 尝试导入 rarfile，未安装则跳过
-try:
-    import rarfile
-    HAS_RARFILE = True
-except ImportError:
-    HAS_RARFILE = False
+# RAR 支持：使用系统 unrar-free 命令（Docker 已安装）
+def _has_unrar() -> bool:
+    return shutil.which('unrar-free') is not None or shutil.which('unrar') is not None
+
+def _get_unrar_cmd() -> str:
+    if shutil.which('unrar-free'):
+        return 'unrar-free'
+    if shutil.which('unrar'):
+        return 'unrar'
+    return ''
 from app.database import skills_db, versions_db, search_db
 
 
@@ -132,13 +139,30 @@ def extract_skill_md(archive_path: Path) -> dict:
             if md_file in data:
                 content = data[md_file].read().decode('utf-8')
     
-    # RAR
-    elif suffix == '.rar' and HAS_RARFILE:
-        with rarfile.RarFile(archive_path, 'r') as rf:
-            md_file = _find_skill_md_in_list(rf.namelist())
+    # RAR - 使用系统 unrar-free/unrar 命令
+    elif suffix == '.rar' and _has_unrar():
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cmd = _get_unrar_cmd()
+            # 解压所有文件到临时目录
+            # unrar-free: -x 解压, -f 覆盖, 目标目录在最后
+            # unrar-nonfree: x 解压, 目标目录在最后
+            extract_result = subprocess.run(
+                [cmd, '-x', '-f', str(archive_path), tmpdir],
+                capture_output=True, text=True
+            )
+            # 在临时目录中查找 skill.md
+            md_file = None
+            for root, dirs, files in os.walk(tmpdir):
+                for f in files:
+                    if f.lower().endswith('skill.md'):
+                        md_file = os.path.join(root, f)
+                        break
+                if md_file:
+                    break
             if not md_file:
                 raise ValueError("压缩包中未找到 skill.md 文件")
-            content = rf.read(md_file).decode('utf-8')
+            with open(md_file, 'r', encoding='utf-8') as f:
+                content = f.read()
     
     if content is None:
         raise ValueError("不支持的压缩包格式，请使用 zip/tar.gz/7z/rar")

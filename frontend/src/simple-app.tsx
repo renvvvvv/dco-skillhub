@@ -6,7 +6,7 @@ import { Button } from './shared/ui/button'
 import { Input } from './shared/ui/input'
 import { Label } from './shared/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from './shared/ui/card'
-import { StaffSearchInput, Staff } from './components/StaffSearchInput'
+import { StaffSearchInput, Staff, refreshStaffCache } from './components/StaffSearchInput'
 
 const SKILL_TAGS = ['技术开发', '数据分析', '产品设计', '运维支撑', '项目管理', '市场营销']
 const TAG_COLORS: Record<string, string> = {
@@ -652,6 +652,8 @@ function 编辑SkillDialog({ skill, isOpen, onClose, onSave }: {
     formData.append('tags', tags.join(','))
     try {
       await updateSkill(skill.slug, formData)
+      // 刷新人员缓存，确保新人员下次能搜到
+      refreshStaffCache()
       alert('保存成功!')
       onSave()
       onClose()
@@ -1007,9 +1009,18 @@ function 发布View({ onSuccess }: { onSuccess: () => void }) {
     formData.append('tags', tags.join(','))
     formData.append('skillName', skillName.trim())
     formData.append('skillDescription', skillDesc.trim())
-    try { setIsSubmitting(true); await publishSkill(formData); alert('发布成功! 请等待管理员审核。'); onSuccess() }
-    catch (err) { alert('发布失败: ' + (err as Error).message) }
-    finally { setIsSubmitting(false) }
+    try {
+      setIsSubmitting(true)
+      await publishSkill(formData)
+      // 刷新人员缓存，确保新人员下次能搜到
+      refreshStaffCache()
+      alert('发布成功! 请等待管理员审核。')
+      onSuccess()
+    } catch (err) {
+      alert('发布失败: ' + (err as Error).message)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
   return (
     <Card className="max-w-2xl mx-auto">
@@ -1032,8 +1043,8 @@ function 发布View({ onSuccess }: { onSuccess: () => void }) {
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            <div><Label htmlFor="authorDepartment">部门</Label><Input id="authorDepartment" value={authorDepartment} readOnly className="bg-gray-50" /></div>
-            <div><Label htmlFor="authorOrganization">组织</Label><Input id="authorOrganization" value={authorOrganization} readOnly className="bg-gray-50" /></div>
+            <div><Label htmlFor="authorDepartment">部门</Label><Input id="authorDepartment" value={authorDepartment} onChange={(e) => setAuthorDepartment(e.target.value)} /></div>
+            <div><Label htmlFor="authorOrganization">组织</Label><Input id="authorOrganization" value={authorOrganization} onChange={(e) => setAuthorOrganization(e.target.value)} /></div>
           </div>
 
           <div><Label>标签</Label><div className="mt-2"><TagMultiSelect value={tags} onChange={setTags} /></div></div>

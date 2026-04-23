@@ -1,0 +1,137 @@
+time="2026-04-17T02:00:07Z" level=warning msg="/root/doc-skillhub/docker-compose.yml: `version` is obsolete"
+#0 building with "default" instance using docker driver
+
+#1 [backend internal] load build definition from Dockerfile
+#1 transferring dockerfile: 378B done
+#1 DONE 0.0s
+
+#2 [backend internal] load metadata for docker.io/library/python:3.11-slim
+#2 DONE 0.0s
+
+#3 [backend internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [backend 1/6] FROM docker.io/library/python:3.11-slim
+#4 DONE 0.0s
+
+#5 [backend internal] load build context
+#5 transferring context: 23.03kB 0.0s done
+#5 DONE 0.0s
+
+#6 [backend 2/6] WORKDIR /app
+#6 CACHED
+
+#7 [backend 3/6] COPY requirements.txt .
+#7 CACHED
+
+#8 [backend 4/6] RUN pip install --no-cache-dir -r requirements.txt
+#8 CACHED
+
+#9 [backend 5/6] COPY app/ ./app/
+#9 CACHED
+
+#10 [backend 6/6] RUN mkdir -p data storage
+#10 CACHED
+
+#11 [backend] exporting to image
+#11 exporting layers done
+#11 writing image sha256:b4318ac82568b238cfe115ce640c80075a53eaaeca00c52beb6116ebb9c7e42a done
+#11 naming to docker.io/library/doc-skillhub-backend done
+#11 DONE 0.0s
+
+#12 [nginx internal] load build definition from Dockerfile
+#12 transferring dockerfile: 764B done
+#12 DONE 0.0s
+
+#13 [nginx internal] load metadata for docker.io/library/node:22-alpine
+#13 DONE 0.3s
+
+#14 [nginx internal] load metadata for docker.io/library/nginx:alpine
+#14 DONE 0.3s
+
+#15 [nginx internal] load .dockerignore
+#15 transferring context: 2B done
+#15 DONE 0.0s
+
+#16 [nginx build 1/7] FROM docker.io/library/node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
+#16 DONE 0.0s
+
+#17 [nginx stage-1 1/7] FROM docker.io/library/nginx:alpine@sha256:8aa63af009a39ecd6c28d61da578a5447378c10bb097a069e3a3e0fb42bb6b19
+#17 CACHED
+
+#18 [nginx internal] load build context
+#18 transferring context: 2.23MB 0.1s done
+#18 DONE 0.1s
+
+#19 [nginx build 4/7] COPY package.json pnpm-lock.yaml ./
+#19 CACHED
+
+#20 [nginx build 2/7] RUN corepack enable
+#20 CACHED
+
+#21 [nginx build 3/7] WORKDIR /app
+#21 CACHED
+
+#22 [nginx build 5/7] RUN pnpm install --frozen-lockfile
+#22 CACHED
+
+#23 [nginx build 6/7] COPY . .
+#23 DONE 0.1s
+
+#24 [nginx build 7/7] RUN pnpm build
+#24 0.835 
+#24 0.835 > skillhub-web@0.1.0 build /app
+#24 0.835 > tsc -b && vite build
+#24 0.835 
+#24 17.38 vite v6.4.1 building for production...
+#24 18.12 
+#24 18.12 new URL("../runtime-config.js", import.meta.url) doesn't exist at build time, it will remain unchanged to be resolved at runtime. If this is intended, you can use the /* @vite-ignore */ comment to suppress this warning.
+#24 18.12 transforming...
+#24 21.55 ✓ 89 modules transformed.
+#24 21.73 rendering chunks...
+#24 21.90 computing gzip size...
+#24 21.92 dist/index.html                  1.12 kB │ gzip:  0.56 kB
+#24 21.92 dist/assets/main-CwolohbG.css   75.18 kB │ gzip: 13.35 kB
+#24 21.92 dist/assets/index-BJ_i-R5_.js    2.63 kB │ gzip:  1.28 kB
+#24 21.92 dist/assets/main-efp-WuEg.js   318.78 kB │ gzip: 97.70 kB
+#24 21.92 ✓ built in 4.49s
+#24 DONE 22.1s
+
+#25 [nginx stage-1 2/7] COPY --from=build /app/dist /usr/share/nginx/html
+#25 DONE 0.0s
+
+#26 [nginx stage-1 3/7] COPY --from=build /app/src/docs/skill.md.template /usr/share/nginx/html/registry/skill.md.template
+#26 DONE 0.0s
+
+#27 [nginx stage-1 4/7] COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+#27 DONE 0.0s
+
+#28 [nginx stage-1 5/7] COPY runtime-config.js.template /usr/share/nginx/html/runtime-config.js.template
+#28 DONE 0.0s
+
+#29 [nginx stage-1 6/7] COPY docker-entrypoint.d/30-runtime-config.sh /docker-entrypoint.d/30-runtime-config.sh
+#29 DONE 0.0s
+
+#30 [nginx stage-1 7/7] RUN chmod +x /docker-entrypoint.d/30-runtime-config.sh
+#30 DONE 0.3s
+
+#31 [nginx] exporting to image
+#31 exporting layers 0.1s done
+#31 writing image sha256:97a3768aaa1110823f878f317944ac8a70e4f85843f05f025ab63e4d405ae1a6 done
+#31 naming to docker.io/library/doc-skillhub-nginx done
+#31 DONE 0.1s
+ Network doc-skillhub_default  Creating
+ Network doc-skillhub_default  Created
+ Volume "doc-skillhub_backend_storage"  Creating
+ Volume "doc-skillhub_backend_storage"  Created
+ Volume "doc-skillhub_backend_data"  Creating
+ Volume "doc-skillhub_backend_data"  Created
+ Container doc-skillhub-backend-1  Creating
+ Container doc-skillhub-backend-1  Created
+ Container doc-skillhub-nginx-1  Creating
+ Container doc-skillhub-nginx-1  Created
+ Container doc-skillhub-backend-1  Starting
+ Container doc-skillhub-backend-1  Started
+ Container doc-skillhub-nginx-1  Starting
+Error response from daemon: driver failed programming external connectivity on endpoint doc-skillhub-nginx-1 (b628877749c79125f4c39c67bac00a56b1962c8c5540978566582a14a64a37b5): Error starting userland proxy: listen tcp4 0.0.0.0:80: bind: address already in use
