@@ -744,8 +744,12 @@ export function SimpleApp() {
   const [activeSubTags, setActiveSubTags] = useState<string[]>([])
   const [adminToken, setAdminToken] = useState<string | null>(null)
   const [showAdminLogin, setShowAdminLogin] = useState(false)
+  const [currentPage, setCurrentPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [searchQuery, setSearchQuery] = useState('')
+  const PAGE_SIZE = 12
 
-  useEffect(() => { if (currentView !== 'start') { loadSkills() } }, [currentView])
+  useEffect(() => { if (currentView !== 'start') { loadSkills(0) } }, [currentView])
 
   // 构建筛选用的标签列表
   // 规则：如果只选了一级标签（没选其二级标签），则展示该分类下所有技能（含所有二级标签）
@@ -764,28 +768,40 @@ export function SimpleApp() {
     return Array.from(tags)
   }
 
-  async function loadSkills() {
+  async function loadSkills(page = 0) {
     try {
       setIsLoading(true); setError(null)
+      setCurrentPage(page)
       const filterTags = getFilterTags()
-      const result = await getSkills(filterTags.length > 0 ? { tags: filterTags.join(',') } : undefined)
+      const params = { page, size: PAGE_SIZE, ...(filterTags.length > 0 ? { tags: filterTags.join(',') } : {}) }
+      console.log('[loadSkills] Request params:', params)
+      const result = await getSkills(params)
+      console.log('[loadSkills] Response:', result.data.totalElements, 'items,', result.data.totalPages, 'pages')
       setSkills(result.data.content)
+      setTotalPages(result.data.totalPages)
     }
     catch (err) { setError('加载失败: ' + (err as Error).message) }
     finally { setIsLoading(false) }
   }
 
-  async function handle搜索(query: string) {
-    if (!query.trim()) { loadSkills(); return }
+  async function handle搜索(query: string, page = 0) {
+    // 保存搜索关键词，用于翻页时保持搜索状态
+    if (query.trim()) setSearchQuery(query)
+    if (!searchQuery && !query.trim()) { loadSkills(page); return }
+    const q = query.trim() || searchQuery
     try {
       setIsLoading(true)
-      const result = await searchSkills(query)
+      setCurrentPage(page)
+      const result = await searchSkills(q)
       let results = result.data.content
       const filterTags = getFilterTags()
       if (filterTags.length > 0) {
         results = results.filter(s => filterTags.some(t => (s.tags || []).includes(t)))
       }
-      setSkills(results)
+      // 本地分页
+      const total = results.length
+      setTotalPages(Math.max(1, Math.ceil(total / PAGE_SIZE)))
+      setSkills(results.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE))
     }
     catch (err) { setError('搜索 failed: ' + (err as Error).message) }
     finally { setIsLoading(false) }
@@ -807,7 +823,7 @@ export function SimpleApp() {
   }
 
   useEffect(() => {
-    if (currentView === 'home') loadSkills()
+    if (currentView === 'home') loadSkills(0)
   }, [activeTags, activeSubTags])
 
   async function handleSkillClick(slug: string) {
@@ -922,9 +938,20 @@ export function SimpleApp() {
                 )}
               </div>
               {isLoading && <div className="text-center py-12"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto"></div><p className="mt-4 text-gray-500">加载中...</p></div>}
-              {error && <div className="text-center py-12"><p className="text-red-500 mb-4">{error}</p><Button onClick={loadSkills}>重试</Button></div>}
+              {error && <div className="text-center py-12"><p className="text-red-500 mb-4">{error}</p><Button onClick={() => loadSkills(currentPage)}>重试</Button></div>}
               {!isLoading && !error && skills.length === 0 && <div className="text-center py-12"><p className="text-gray-500">暂无技能</p></div>}
-              {!isLoading && !error && skills.length > 0 && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{skills.map(skill => <SimpleSkillCard key={skill.id} skill={skill} onClick={() => handleSkillClick(skill.slug)} onDelete={(e) => handleDeleteSkill(e, skill.slug)} />)}</div>}
+              {!isLoading && !error && skills.length > 0 && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{skills.map(skill => <SimpleSkillCard key={skill.id} skill={skill} onClick={() => handleSkillClick(skill.slug)} onDelete={(e) => handleDeleteSkill(e, skill.slug)} />)}</div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-3 py-4">
+                      <Button variant="outline" size="sm" onClick={() => handle搜索('', currentPage - 1)} disabled={currentPage <= 0}>上一页</Button>
+                      <span className="px-4 py-1.5 rounded-lg bg-gray-100 text-sm font-medium">第 {currentPage + 1} / {totalPages} 页</span>
+                      <Button variant="outline" size="sm" onClick={() => handle搜索('', currentPage + 1)} disabled={currentPage >= totalPages - 1}>下一页</Button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         )}
