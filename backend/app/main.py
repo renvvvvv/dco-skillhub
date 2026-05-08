@@ -13,11 +13,24 @@ from datetime import datetime, timedelta
 from collections import Counter
 
 from app.config import STORAGE_DIR, MAX_FILE_SIZE
-from app.database import skills_db, versions_db, views_db, view_records_db, audit_logs_db, staff_db
+from app.database import skills_db, versions_db, views_db, view_records_db, audit_logs_db, staff_db, metrics_daily_db
 from app.services import (
     hash_admin_key, verify_admin_key, extract_skill_md,
     generate_slug, update_search_index, search_skills,
     get_skill_versions, delete_skill
+)
+from app.org_mapping import (
+    enrich_staff_record, get_all_regions, get_dcs_by_region,
+    ALL_L1_REGIONS, IDC_REGIONS, IDC_CENTERS
+)
+from app.events import (
+    track_skill_view, track_skill_download, track_search,
+    track_skill_publish, track_tag_click, track_page_view,
+    track_admin_action, get_realtime_events, get_events_range
+)
+from app.metrics import (
+    get_kpi_summary, get_trend_data, get_daily_metrics,
+    get_metrics_range, aggregate_daily, aggregate_all_missing
 )
 
 app = FastAPI(
@@ -54,7 +67,15 @@ def _ensure_staff_initialized():
             with open(dict_path, 'r', encoding='utf-8') as f:
                 initial_staff = json.loads(f.read())
             if isinstance(initial_staff, list):
-                staff_db.write({"staff": initial_staff})
+                # 为导入的数据自动补充 IDC 字段
+                enriched_staff = []
+                for person in initial_staff:
+                    person = enrich_staff_record(person)
+                    person["status"] = person.get("status", "active")
+                    person["created_at"] = person.get("created_at", datetime.now().isoformat())
+                    person["updated_at"] = person.get("updated_at", datetime.now().isoformat())
+                    enriched_staff.append(person)
+                staff_db.write({"staff": enriched_staff})
         except Exception:
             pass
 
@@ -63,21 +84,25 @@ _ensure_staff_initialized()
 
 
 def _upsert_staff(name: str, employee_id: str, department: str, organization: str):
-    """新增或更新人员字典"""
+    """新增或更新人员字典（含 IDC 标准化字段）"""
     if not name.strip():
         return
     def updater(data):
         staff_list = data.get("staff", [])
         # 按 employee_id 或 name 匹配
         existing = None
+        match_confidence = 0
         for s in staff_list:
             if employee_id and (s.get("employee_id") == employee_id or s.get("new_employee_id") == employee_id):
                 existing = s
+                match_confidence = 100
                 break
-            if s.get("name") == name.strip():
+            if s.get("name") == name.strip() and match_confidence < 50:
                 existing = s
-                break
-        if existing:
+                match_confidence = 50
+        
+        if existing and match_confidence >= 50:
+            # 更新现有记录
             if employee_id:
                 if not existing.get("employee_id"):
                     existing["employee_id"] = employee_id
@@ -85,16 +110,27 @@ def _upsert_staff(name: str, employee_id: str, department: str, organization: st
                     existing["new_employee_id"] = employee_id
             if department:
                 existing["department"] = department
+                # 部门变更时，重新计算 IDC 字段
+                existing.update(enrich_staff_record({"department": department}))
             if organization:
                 existing["organization"] = organization
+            existing["updated_at"] = datetime.now().isoformat()
         else:
-            staff_list.append({
+            # 创建新记录（自动补充 IDC 字段）
+            new_staff = {
                 "name": name.strip(),
                 "employee_id": employee_id or "",
                 "new_employee_id": "",
                 "department": department or "",
-                "organization": organization or ""
-            })
+                "organization": organization or "",
+                "status": "active",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+            }
+            # 补充 IDC 标准字段
+            new_staff.update(enrich_staff_record({"department": department}))
+            staff_list.append(new_staff)
+        
         data["staff"] = staff_list
     staff_db.update(updater)
 
@@ -366,8 +402,17 @@ async def create_skill(
         # 自动同步人员字典
         _upsert_staff(authorName, authorEmployeeId, authorDepartment, authorOrganization)
         
-        # 记录日志
+        # 记录审计日志
         add_audit_log("publish", slug, skill_info["name"], authorName, "发布新技能", request)
+        
+        # 记录埋点事件
+        track_skill_publish(
+            slug=slug,
+            skill_name=skill_record["name"],
+            author=authorName,
+            tags=skill_tags,
+            file_size=final_path.stat().st_size
+        )
         
         return {
             "success": True,
@@ -436,8 +481,16 @@ def download_skill(
     
     skills_db.update(increment_download)
     
-    # 记录日志
+    # 记录审计日志
     add_audit_log("download", slug, skill["name"], "", f"下载版本 {version}", request)
+    
+    # 记录埋点事件
+    track_skill_download(
+        slug=slug,
+        skill_name=skill["name"],
+        version=version,
+        ip=get_client_ip(request)
+    )
     
     return FileResponse(
         file_path,
@@ -612,9 +665,37 @@ def delete_skill_endpoint(slug: str, request: Request = None):
 
 
 @app.get("/api/search")
-def search(q: str = Query(..., min_length=1)):
-    """全文搜索"""
-    results = search_skills(q)
+def search(
+    q: str = Query("", min_length=0),
+    author: str = Query(None),
+    department: str = Query(None),
+    tag: str = Query(None),
+    request: Request = None
+):
+    """全文搜索（支持按作者、部门、标签筛选）
+    
+    Query参数:
+        q: 搜索关键词（匹配名称、描述、作者、部门）
+        author: 按作者名筛选
+        department: 按部门筛选
+        tag: 按标签筛选
+    """
+    results = search_skills(
+        query=q,
+        filter_author=author,
+        filter_department=department,
+        filter_tag=tag
+    )
+    
+    # 记录搜索埋点（异步，不阻塞返回）
+    try:
+        track_search(
+            query=f"{q} (author={author}, dept={department}, tag={tag})",
+            results_count=len(results),
+            ip=get_client_ip(request) if request else ""
+        )
+    except Exception:
+        pass
     
     return {
         "success": True,
@@ -722,6 +803,13 @@ def record_view(slug: str, request: Request):
     skill = next((s for s in skills_data.get("skills", []) if s["slug"] == slug), None)
     if skill:
         add_audit_log("view", slug, skill["name"], "", "浏览技能详情", request)
+        
+        # 记录埋点事件
+        track_skill_view(
+            slug=slug,
+            skill_name=skill["name"],
+            ip=ip
+        )
     
     return {"success": True, "recorded": True}
 
@@ -746,9 +834,58 @@ def get_stats():
     ]
     skill_stats.sort(key=lambda x: x["downloads"], reverse=True)
     
-    # 部门上传量
-    dept_counts = Counter(s.get("author_department", "未知部门") for s in skills)
-    department_stats = [{"name": name, "count": count} for name, count in dept_counts.most_common()]
+    # 部门上传量（按 IDC 区域聚合）
+    region_counts = Counter()
+    dc_counts = Counter()
+    center_counts = Counter()
+    unmapped_dept_counts = Counter()
+    
+    for s in skills:
+        dept = s.get("author_department", "未知部门")
+        # 尝试从 staff_db 中查找该人员的 IDC 信息
+        staff_data = staff_db.read()
+        staff_info = next(
+            (st for st in staff_data.get("staff", [])
+             if st.get("name") == s.get("author_name") and st.get("idc_mapped")),
+            None
+        )
+        
+        if staff_info:
+            if staff_info.get("region_id") == "hq" and staff_info.get("center_name"):
+                center_counts[staff_info["center_name"]] += 1
+            elif staff_info.get("region_name"):
+                region_counts[staff_info["region_name"]] += 1
+                if staff_info.get("dc_short"):
+                    dc_counts[staff_info["dc_short"]] += 1
+            else:
+                unmapped_dept_counts[dept] += 1
+        else:
+            #  fallback：直接映射
+            from app.org_mapping import get_idc_info
+            idc_info = get_idc_info(dept)
+            if idc_info["mapped"]:
+                if idc_info["region_id"] == "hq":
+                    center_counts[idc_info["center_name"]] += 1
+                else:
+                    region_counts[idc_info["region_name"]] += 1
+            else:
+                unmapped_dept_counts[dept] += 1
+    
+    # 构建区域统计（包含所有区域，无数据补0）
+    region_stats = []
+    for r in ALL_L1_REGIONS:
+        region_stats.append({
+            "id": r["id"],
+            "name": r["name"],
+            "count": region_counts.get(r["name"], 0)
+        })
+    region_stats.sort(key=lambda x: -x["count"])
+    
+    # 数据中心统计
+    dc_stats = [{"name": name, "count": count} for name, count in dc_counts.most_common()]
+    
+    # 职能中心统计
+    center_stats = [{"name": name, "count": count} for name, count in center_counts.most_common()]
     
     # 个人上传量
     dev_counts = Counter(s.get("author_name", "未知") for s in skills)
@@ -758,10 +895,144 @@ def get_stats():
         "success": True,
         "data": {
             "skills": skill_stats,
-            "departments": department_stats,
+            "regions": region_stats,
+            "datacenters": dc_stats,
+            "centers": center_stats,
+            "unmapped_departments": [{"name": name, "count": count} for name, count in unmapped_dept_counts.most_common()],
+            "departments": [{"name": name, "count": count} for name, count in Counter(s.get("author_department", "未知部门") for s in skills).most_common()],
             "developers": developer_stats
         }
     }
+
+
+# ============ 新统计 API（运营驾驶舱）============
+
+@app.get("/api/stats/kpi")
+def get_kpi():
+    """获取KPI汇总卡片数据（今日/昨日/本周/本月）"""
+    try:
+        # 确保今日数据已聚合
+        today = datetime.now().strftime("%Y-%m-%d")
+        if not get_daily_metrics(today):
+            aggregate_daily(today)
+        
+        kpi = get_kpi_summary()
+        return {"success": True, "data": kpi}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+@app.get("/api/stats/trend")
+def get_trend(
+    start: str = Query(None),
+    end: str = Query(None),
+    days: int = Query(30, ge=1, le=90)
+):
+    """获取趋势数据（折线图）
+    
+    Query参数:
+        start: 开始日期 YYYY-MM-DD
+        end: 结束日期 YYYY-MM-DD
+        days: 最近N天（默认30，当start/end未指定时使用）
+    """
+    try:
+        if start and end:
+            trend = get_trend_data(start, end)
+        else:
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+            trend = get_trend_data(
+                start_date.strftime("%Y-%m-%d"),
+                end_date.strftime("%Y-%m-%d")
+            )
+        return {"success": True, "data": trend}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+
+@app.get("/api/stats/realtime")
+def get_realtime(limit: int = Query(20, ge=1, le=100)):
+    """获取实时活动流"""
+    events = get_realtime_events(limit)
+    
+    # 格式化事件为前端友好的格式
+    formatted = []
+    for e in events:
+        meta = e.get("metadata", {})
+        event_type = e["type"]
+        
+        # 生成描述文本
+        desc = ""
+        if event_type == "skill.view":
+            desc = f"浏览了 {meta.get('skill_name', meta.get('slug', ''))}"
+        elif event_type == "skill.download":
+            desc = f"下载了 {meta.get('skill_name', meta.get('slug', ''))}"
+        elif event_type == "skill.publish":
+            desc = f"发布了 {meta.get('skill_name', meta.get('slug', ''))}"
+        elif event_type == "search":
+            desc = f"搜索: {meta.get('query', '')}"
+        elif event_type == "tag.click":
+            desc = f"点击标签: {meta.get('tag_name', '')}"
+        elif event_type == "admin.action":
+            desc = f"管理员{meta.get('action', '')}: {meta.get('skill_name', '')}"
+        
+        formatted.append({
+            "id": e["id"],
+            "type": event_type,
+            "user": e.get("user", ""),
+            "description": desc,
+            "timestamp": e["timestamp"],
+            "metadata": meta,
+        })
+    
+    return {"success": True, "data": formatted}
+
+
+@app.get("/api/stats/search-analysis")
+def get_search_analysis(
+    days: int = Query(7, ge=1, le=30)
+):
+    """获取搜索分析数据"""
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    events = get_events_range(
+        start_date.strftime("%Y-%m-%d"),
+        end_date.strftime("%Y-%m-%d"),
+        event_type="search"
+    )
+    
+    queries = Counter()
+    zero_result_queries = Counter()
+    total = len(events)
+    zero_total = 0
+    
+    for e in events:
+        meta = e.get("metadata", {})
+        q = meta.get("query", "")
+        queries[q] += 1
+        if not meta.get("has_results", True):
+            zero_result_queries[q] += 1
+            zero_total += 1
+    
+    return {
+        "success": True,
+        "data": {
+            "period_days": days,
+            "total_searches": total,
+            "zero_result_count": zero_total,
+            "zero_result_rate": round(zero_total / total * 100, 1) if total else 0,
+            "top_queries": [{"query": q, "count": c} for q, c in queries.most_common(20)],
+            "zero_result_queries": [{"query": q, "count": c} for q, c in zero_result_queries.most_common(10)],
+        }
+    }
+
+
+@app.post("/api/stats/aggregate")
+def trigger_aggregate(date: str = Form(None)):
+    """手动触发指标聚合（管理用途）"""
+    result = aggregate_daily(date)
+    return {"success": True, "data": result}
 
 
 # ============ 管理后台 API ============
@@ -946,11 +1217,74 @@ def get_logs(
 
 @app.get("/api/staff")
 def list_staff():
-    """获取全部人员列表"""
+    """获取全部人员列表（兼容旧格式 + 自动补全 IDC 字段）"""
     data = staff_db.read()
+    staff_list = data.get("staff", [])
+    
+    # 自动为旧数据补全 IDC 字段
+    enriched = []
+    for s in staff_list:
+        if "region_id" not in s:
+            s = enrich_staff_record(s)
+        enriched.append(s)
+    
     return {
         "success": True,
-        "data": data.get("staff", [])
+        "data": enriched
+    }
+
+
+@app.get("/api/staff/by-region")
+def list_staff_by_region(region_id: str = Query(...)):
+    """按区域查询人员"""
+    data = staff_db.read()
+    staff = [
+        s for s in data.get("staff", [])
+        if s.get("region_id") == region_id or s.get("center_id", "").startswith(region_id)
+    ]
+    return {"success": True, "data": staff, "total": len(staff)}
+
+
+@app.get("/api/staff/by-dc")
+def list_staff_by_dc(dc_id: str = Query(...)):
+    """按数据中心查询人员"""
+    data = staff_db.read()
+    staff = [
+        s for s in data.get("staff", [])
+        if s.get("dc_id") == dc_id
+    ]
+    return {"success": True, "data": staff, "total": len(staff)}
+
+
+@app.get("/api/org-structure")
+def get_org_structure():
+    """获取 IDC 标准组织架构"""
+    regions = []
+    for rid, info in sorted(IDC_REGIONS.items(), key=lambda x: x[1]["sort_order"]):
+        regions.append({
+            "id": rid,
+            "name": info["name"],
+            "type": "region",
+            "sort_order": info["sort_order"],
+            "dcs": get_dcs_by_region(rid)
+        })
+    
+    centers = []
+    for cid, info in sorted(IDC_CENTERS.items(), key=lambda x: x[1]["sort_order"]):
+        centers.append({
+            "id": cid,
+            "name": info["name"],
+            "type": "center",
+            "sort_order": info["sort_order"]
+        })
+    
+    return {
+        "success": True,
+        "data": {
+            "regions": regions,
+            "centers": centers,
+            "all": ALL_L1_REGIONS
+        }
     }
 
 
@@ -970,6 +1304,42 @@ def add_staff(
 def health():
     """健康检查"""
     return {"status": "healthy", "version": "1.0.0"}
+
+
+@app.get("/api/scheduler/status")
+def scheduler_status():
+    """获取定时任务调度器状态"""
+    from app.scheduler import get_scheduler_status
+    return {"success": True, "data": get_scheduler_status()}
+
+
+@app.post("/api/scheduler/trigger")
+def trigger_scheduler_job(job_id: str = Form(...)):
+    """手动触发定时任务（管理用途）"""
+    from app.scheduler import _scheduler
+    if _scheduler is None:
+        return {"success": False, "message": "Scheduler not running"}
+    
+    job = _scheduler.get_job(job_id)
+    if job is None:
+        return {"success": False, "message": f"Job {job_id} not found"}
+    
+    job.modify(next_run_time=datetime.now())
+    return {"success": True, "message": f"Job {job_id} triggered"}
+
+
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时初始化调度器"""
+    from app.scheduler import start_scheduler
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """应用关闭时清理调度器"""
+    from app.scheduler import stop_scheduler
+    stop_scheduler()
 
 
 if __name__ == "__main__":

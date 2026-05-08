@@ -4,3 +4,4 @@ pydantic>=2.5
 python-multipart>=0.0.6
 py7zr>=0.20
 rarfile>=4.0
+apscheduler>=3.10

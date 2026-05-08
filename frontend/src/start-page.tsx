@@ -43,7 +43,7 @@ export function StartPage({ onEnter }: { onEnter: () => void }) {
         <div className="relative max-w-5xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border border-pink-200 shadow-sm mb-8">
             <span className="text-pink-500">⚡</span>
-            <span className="text-sm font-medium text-gray-700">数智中心 · 运维事业部</span>
+            <span className="text-sm font-medium text-gray-700">运维事业部 · 数智中心</span>
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
             <span className="text-gray-800">DCO SkillHub</span>

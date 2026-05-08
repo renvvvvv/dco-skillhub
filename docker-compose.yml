@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   nginx:
-    build: ./frontend
+    image: doc-skillhub-nginx:new
     ports:
       - "8088:80"
     volumes:
@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
 
   backend:
-    build: ./backend
+    image: doc-skillhub-backend:new
     expose:
       - "8080"
     volumes:

@@ -43,3 +43,7 @@ backend/storage/
 
 # Docker
 .dockerignore
+backup/
+nginx/html/assets/
+scripts/
+nginx/html/

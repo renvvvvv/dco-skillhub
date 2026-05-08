@@ -19,6 +19,12 @@ VIEW_RECORDS_FILE = DATA_DIR / "view_records.json"
 AUDIT_LOGS_FILE = DATA_DIR / "audit_logs.json"
 STAFF_FILE = DATA_DIR / "staff.json"
 
+# 事件与指标数据路径
+EVENTS_DIR = DATA_DIR / "events"
+METRICS_DAILY_FILE = DATA_DIR / "metrics_daily.json"
+METRICS_HOURLY_FILE = DATA_DIR / "metrics_hourly.json"
+SEARCH_LOGS_FILE = DATA_DIR / "search_logs.json"
+
 # 应用配置
 APP_NAME = "SkillHub Lite"
 APP_VERSION = "1.0.0"

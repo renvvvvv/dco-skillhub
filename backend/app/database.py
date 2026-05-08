@@ -4,7 +4,11 @@ import os
 import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from app.config import SKILLS_FILE, VERSIONS_FILE, SEARCH_INDEX_FILE, VIEWS_FILE, VIEW_RECORDS_FILE, AUDIT_LOGS_FILE, STAFF_FILE
+from app.config import (
+    SKILLS_FILE, VERSIONS_FILE, SEARCH_INDEX_FILE, 
+    VIEWS_FILE, VIEW_RECORDS_FILE, AUDIT_LOGS_FILE, STAFF_FILE,
+    METRICS_DAILY_FILE, METRICS_HOURLY_FILE, SEARCH_LOGS_FILE
+)
 
 
 class JSONDatabase:
@@ -73,3 +77,8 @@ views_db = JSONDatabase(VIEWS_FILE, {"views": {}})
 view_records_db = JSONDatabase(VIEW_RECORDS_FILE, {"records": {}})
 audit_logs_db = JSONDatabase(AUDIT_LOGS_FILE, {"logs": []})
 staff_db = JSONDatabase(STAFF_FILE, {"staff": []})
+
+# 新增：指标数据库实例
+metrics_daily_db = JSONDatabase(METRICS_DAILY_FILE, {})
+metrics_hourly_db = JSONDatabase(METRICS_HOURLY_FILE, {})
+search_logs_db = JSONDatabase(SEARCH_LOGS_FILE, {"searches": []})

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getSkills, searchSkills, getSkill, publishSkill, updateSkill, deleteSkill, recordView, getStats, adminLogin, getPending, approveSkill, getAuditLogs, Skill, SkillDetail, StatsData, AuditLog } from './api/simple-client'
+import { getSkills, searchSkills, getSkill, publishSkill, updateSkill, deleteSkill, recordView, getStats, getKpi, getTrend, getRealtimeEvents, getSearchAnalysis, adminLogin, getPending, approveSkill, getAuditLogs, Skill, SkillDetail, StatsData, KpiData, TrendData, RealtimeEvent, SearchAnalysis, AuditLog } from './api/simple-client'
 import { UploadZone } from './features/publish/upload-zone'
 import { SearchBar } from './features/search/search-bar'
 import { Button } from './shared/ui/button'
@@ -72,10 +72,11 @@ const LOG_TYPE_COLORS: Record<string, string> = {
   'reject': 'bg-red-100 text-red-700',
   'delete_pending': 'bg-orange-100 text-orange-700',
   'delete': 'bg-red-100 text-red-700',
+  'search': 'bg-cyan-100 text-cyan-700',
 }
 
 const LOG_TYPE_LABELS: Record<string, string> = {
-  'view': '浏览', 'download': '下载', 'publish': '发布', 'update': '更新', 'approve': '通过', 'reject': '拒绝', 'delete_pending': '删除申请', 'delete': '删除',
+  'view': '浏览', 'download': '下载', 'publish': '发布', 'update': '更新', 'approve': '通过', 'reject': '拒绝', 'delete_pending': '删除申请', 'delete': '删除', 'search': '搜索',
 }
 
 // 二级标签多选组件
@@ -222,16 +223,249 @@ function DonutChart({ items }: { items: { name: string; count: number }[] }) {
   )
 }
 
-// 展示页组件
+// 区域柱状图组件
+function RegionBarChart({ items }: { items: { id: string; name: string; count: number }[] }) {
+  if (!items || items.length === 0) return <p className="text-gray-400 text-sm">暂无数据</p>
+  const max = Math.max(...items.map(i => i.count), 1)
+  const regionColors: Record<string, string> = {
+    'hq': 'from-gray-500 to-gray-600',
+    'hb1': 'from-red-500 to-rose-500',
+    'xs': 'from-orange-500 to-amber-500',
+    'hb2': 'from-yellow-500 to-amber-500',
+    'hb3': 'from-green-500 to-emerald-500',
+    'hd1': 'from-teal-500 to-cyan-500',
+    'hd2': 'from-blue-500 to-indigo-500',
+    'hn': 'from-indigo-500 to-purple-500',
+    'hg': 'from-purple-500 to-pink-500',
+    'qt': 'from-pink-500 to-rose-500',
+  }
+  return (
+    <div className="space-y-2">
+      {items.map((item) => {
+        const pct = max > 0 ? (item.count / max) * 100 : 0
+        const color = regionColors[item.id] || 'from-gray-400 to-gray-500'
+        return (
+          <div key={item.id} className="group">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm font-medium text-gray-700">{item.name}</span>
+              <span className="text-sm font-bold text-gray-900">{item.count}</span>
+            </div>
+            <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full bg-gradient-to-r ${color} transition-all duration-700 ease-out`} style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ========== 运营驾驶舱组件 ==========
+
+// KPI 卡片
+function KpiCard({ title, value, subValue, icon, color }: { title: string; value: number; subValue?: string; icon: string; color: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm text-gray-500 font-medium">{title}</span>
+        <span className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center text-white text-sm`}>{icon}</span>
+      </div>
+      <div className="text-2xl font-bold text-gray-900">{value}</div>
+      {subValue && <div className="text-xs text-gray-400 mt-1">{subValue}</div>}
+    </div>
+  )
+}
+
+// 趋势折线图（SVG）
+function TrendLineChart({ data, height = 200 }: { data: TrendData | undefined; height?: number }) {
+  if (!data || !data.dates || data.dates.length === 0) {
+    return <p className="text-gray-400 text-sm text-center py-8">暂无趋势数据</p>
+  }
+
+  const series = data.series
+  const allValues = [...series.views, ...series.downloads, ...series.publishes]
+  const maxVal = Math.max(...allValues, 1)
+  const minVal = Math.min(...allValues, 0)
+  const range = maxVal - minVal || 1
+  const width = 600
+  const padding = { top: 20, right: 20, bottom: 40, left: 40 }
+  const chartW = width - padding.left - padding.right
+  const chartH = height - padding.top - padding.bottom
+
+  const getX = (i: number) => padding.left + (i / (data.dates.length - 1 || 1)) * chartW
+  const getY = (v: number) => padding.top + chartH - ((v - minVal) / range) * chartH
+
+  const colors = {
+    views: '#8b5cf6',
+    downloads: '#ec4899',
+    publishes: '#10b981',
+  }
+
+  const buildPath = (values: number[]) => {
+    return values.map((v, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(v)}`).join(' ')
+  }
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ minWidth: 400 }}>
+        {/* Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map(pct => {
+          const y = padding.top + chartH * (1 - pct)
+          return (
+            <g key={pct}>
+              <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="#f3f4f6" strokeWidth={1} />
+              <text x={padding.left - 5} y={y + 4} textAnchor="end" fontSize={10} fill="#9ca3af">{Math.round(minVal + range * pct)}</text>
+            </g>
+          )
+        })}
+        {/* Lines */}
+        {(Object.keys(series) as Array<keyof typeof series>).filter(k => k !== 'searches' && k !== 'unique_users').map(key => (
+          <path key={key} d={buildPath(series[key])} fill="none" stroke={colors[key as keyof typeof colors] || '#6b7280'} strokeWidth={2} />
+        ))}
+        {/* X axis labels */}
+        {data.dates.map((d, i) => (
+          <text key={i} x={getX(i)} y={height - 10} textAnchor="middle" fontSize={10} fill="#9ca3af">
+            {d.slice(5)}
+          </text>
+        ))}
+        {/* Legend */}
+        <g transform={`translate(${width - 140}, 10)`}>
+          {Object.entries(colors).map(([key, color], i) => (
+            <g key={key} transform={`translate(0, ${i * 18})`}>
+              <line x1={0} y1={6} x2={16} y2={6} stroke={color} strokeWidth={2} />
+              <text x={22} y={10} fontSize={11} fill="#6b7280">{key === 'views' ? '浏览' : key === 'downloads' ? '下载' : '发布'}</text>
+            </g>
+          ))}
+        </g>
+      </svg>
+    </div>
+  )
+}
+
+// 活动流组件
+function ActivityStream({ events }: { events: RealtimeEvent[] }) {
+  if (!events || events.length === 0) {
+    return <p className="text-gray-400 text-sm text-center py-8">暂无活动</p>
+  }
+
+  const typeIcons: Record<string, string> = {
+    'skill.view': '👁',
+    'skill.download': '⬇',
+    'skill.publish': '📦',
+    'search': '🔍',
+    'tag.click': '🏷',
+    'admin.action': '⚙',
+    'page.view': '📄',
+  }
+
+  const typeColors: Record<string, string> = {
+    'skill.view': 'bg-purple-100 text-purple-600',
+    'skill.download': 'bg-pink-100 text-pink-600',
+    'skill.publish': 'bg-emerald-100 text-emerald-600',
+    'search': 'bg-blue-100 text-blue-600',
+    'tag.click': 'bg-orange-100 text-orange-600',
+    'admin.action': 'bg-gray-100 text-gray-600',
+    'page.view': 'bg-gray-100 text-gray-600',
+  }
+
+  const formatTime = (ts: string) => {
+    const d = new Date(ts)
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+  }
+
+  return (
+    <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+      {events.map(e => (
+        <div key={e.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+          <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 ${typeColors[e.type] || 'bg-gray-100 text-gray-600'}`}>
+            {typeIcons[e.type] || '•'}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-gray-700 truncate">{e.description}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              {e.user && <span className="text-xs text-gray-400">{e.user}</span>}
+              <span className="text-xs text-gray-300">{formatTime(e.timestamp)}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// 搜索分析组件
+function SearchAnalysisPanel({ data }: { data: SearchAnalysis | undefined }) {
+  if (!data) return <p className="text-gray-400 text-sm text-center py-8">暂无数据</p>
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-4">
+        <div className="text-center p-3 bg-gray-50 rounded-lg">
+          <div className="text-xl font-bold text-gray-900">{data.total_searches}</div>
+          <div className="text-xs text-gray-500">总搜索</div>
+        </div>
+        <div className="text-center p-3 bg-gray-50 rounded-lg">
+          <div className="text-xl font-bold text-gray-900">{data.zero_result_rate}%</div>
+          <div className="text-xs text-gray-500">零结果率</div>
+        </div>
+        <div className="text-center p-3 bg-gray-50 rounded-lg">
+          <div className="text-xl font-bold text-gray-900">{data.unique_queries || data.top_queries?.length || 0}</div>
+          <div className="text-xs text-gray-500">不同关键词</div>
+        </div>
+      </div>
+
+      <div>
+        <h4 className="text-sm font-medium text-gray-700 mb-2">热搜关键词</h4>
+        <div className="flex flex-wrap gap-2">
+          {data.top_queries?.slice(0, 10).map((q, i) => (
+            <span key={i} className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs">
+              {q.query} <span className="text-blue-400">({q.count})</span>
+            </span>
+          )) || <span className="text-xs text-gray-400">暂无数据</span>}
+        </div>
+      </div>
+
+      {data.zero_result_queries && data.zero_result_queries.length > 0 && (
+        <div>
+          <h4 className="text-sm font-medium text-red-600 mb-2">零结果搜索</h4>
+          <div className="flex flex-wrap gap-2">
+            {data.zero_result_queries.slice(0, 5).map((q, i) => (
+              <span key={i} className="px-2 py-1 bg-red-50 text-red-600 rounded text-xs">
+                {q.query} <span className="text-red-400">({q.count})</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// 运营驾驶舱主组件
 function StatsView() {
   const [stats, setStats] = useState<StatsData | null>(null)
+  const [kpi, setKpi] = useState<KpiData | null>(null)
+  const [trend, setTrend] = useState<TrendData | null>(null)
+  const [realtime, setRealtime] = useState<RealtimeEvent[]>([])
+  const [searchAnalysis, setSearchAnalysis] = useState<SearchAnalysis | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('week')
 
   useEffect(() => {
     async function load() {
       try {
-        const result = await getStats()
-        setStats(result.data)
+        const [statsRes, kpiRes, trendRes, realtimeRes, searchRes] = await Promise.all([
+          getStats(),
+          getKpi(),
+          getTrend(timeRange === 'today' ? 1 : timeRange === 'week' ? 7 : 30),
+          getRealtimeEvents(15),
+          getSearchAnalysis(7),
+        ])
+        setStats(statsRes.data)
+        setKpi(kpiRes.data)
+        setTrend(trendRes.data)
+        setRealtime(realtimeRes.data || [])
+        setSearchAnalysis(searchRes.data)
       } catch (err) {
         console.error('加载统计失败', err)
       } finally {
@@ -239,30 +473,124 @@ function StatsView() {
       }
     }
     load()
-  }, [])
+
+    // 实时活动流轮询
+    const interval = setInterval(async () => {
+      try {
+        const res = await getRealtimeEvents(15)
+        setRealtime(res.data || [])
+      } catch (e) {
+        // ignore
+      }
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [timeRange])
 
   if (isLoading) {
     return (
       <div className="text-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto"></div>
-        <p className="mt-4 text-gray-500">加载统计数据...</p>
+        <p className="mt-4 text-gray-500">加载运营数据...</p>
       </div>
     )
   }
 
-  if (!stats) return <div className="text-center py-12 text-gray-500">加载失败</div>
-
-  const downloadSorted = [...stats.skills].sort((a, b) => b.downloads - a.downloads).slice(0, 10)
-  const viewSorted = [...stats.skills].sort((a, b) => b.views - a.views).slice(0, 10)
-  const devSorted = [...stats.developers].sort((a, b) => b.count - a.count).slice(0, 10)
+  const kpiData = kpi?.[timeRange] || kpi?.today
+  const downloadSorted = stats ? [...stats.skills].sort((a, b) => b.downloads - a.downloads).slice(0, 10) : []
+  const devSorted = stats ? [...stats.developers].sort((a, b) => b.count - a.count).slice(0, 10) : []
 
   return (
     <div className="space-y-6">
-      <div className="text-center py-6">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">DC运维skill龙虎榜</h2>
-        <p className="text-gray-500">技能下载、浏览、部门与个人贡献统计</p>
+      {/* 头部 */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">SkillHub 运营驾驶舱</h2>
+          <p className="text-sm text-gray-500 mt-1">实时监控技能市场运营数据</p>
+        </div>
+        <div className="flex bg-gray-100 rounded-lg p-1">
+          {(['today', 'week', 'month'] as const).map(r => (
+            <button
+              key={r}
+              onClick={() => setTimeRange(r)}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                timeRange === r ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {r === 'today' ? '今日' : r === 'week' ? '本周' : '本月'}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {/* 平台累计概览 */}
+      {stats?.overview && (
+        <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
+            <span>📊</span> 平台累计数据
+          </h3>
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+            {[
+              { label: '技能总数', value: stats.overview.skills_total, icon: '📦', color: 'bg-emerald-500' },
+              { label: '版本总数', value: stats.overview.versions_total, icon: '🏷', color: 'bg-violet-500' },
+              { label: '作者人数', value: stats.overview.authors_total, icon: '👤', color: 'bg-orange-500' },
+              { label: '部门覆盖', value: stats.overview.departments_total, icon: '🏢', color: 'bg-blue-500' },
+              { label: '标签种类', value: stats.overview.tags_total, icon: '🏷', color: 'bg-pink-500' },
+              { label: '待审核', value: stats.overview.pending_total, icon: '⏳', color: 'bg-amber-500' },
+            ].map(item => (
+              <div key={item.label} className="text-center">
+                <div className={`w-10 h-10 rounded-lg ${item.color} flex items-center justify-center text-white text-lg mx-auto mb-2`}>
+                  {item.icon}
+                </div>
+                <div className="text-xl font-bold text-gray-900">{item.value}</div>
+                <div className="text-xs text-gray-500">{item.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* KPI 卡片 */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <KpiCard title="技能发布" value={kpiData?.skills_total || 0} icon="📦" color="bg-emerald-500" />
+        <KpiCard title="下载次数" value={kpiData?.downloads || 0} icon="⬇" color="bg-pink-500" />
+        <KpiCard title="浏览次数" value={kpiData?.views || 0} icon="👁" color="bg-purple-500" />
+        <KpiCard title="搜索次数" value={kpiData?.searches || 0} icon="🔍" color="bg-blue-500" />
+        <KpiCard title="活跃用户" value={kpiData?.unique_users || 0} icon="👤" color="bg-orange-500" />
+      </div>
+
+      {/* 趋势图 + 活动流 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-sm">📈</span>
+              趋势分析
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TrendLineChart data={trend || undefined} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-teal-500 flex items-center justify-center text-white text-sm">⚡</span>
+              实时活动
+              <span className="ml-auto flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ActivityStream events={realtime} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 排行榜 + 区域分布 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -277,21 +605,24 @@ function StatsView() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-sm">👁</span>
-              技能浏览排行榜
+              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white text-sm">🏢</span>
+              区域上传分布
             </CardTitle>
           </CardHeader>
-          <CardContent><RankBar items={viewSorted} valueKey="views" labelKey="name" colorIndex={1} /></CardContent>
+          <CardContent><RegionBarChart items={stats?.regions || []} /></CardContent>
         </Card>
+      </div>
 
+      {/* 搜索分析 + 个人排行 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white text-sm">🏢</span>
-              部门上传分布
+              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm">🔍</span>
+              搜索分析
             </CardTitle>
           </CardHeader>
-          <CardContent><DonutChart items={stats.departments} /></CardContent>
+          <CardContent><SearchAnalysisPanel data={searchAnalysis || undefined} /></CardContent>
         </Card>
 
         <Card>
@@ -304,6 +635,35 @@ function StatsView() {
           <CardContent><RankBar items={devSorted} valueKey="count" labelKey="name" colorIndex={3} /></CardContent>
         </Card>
       </div>
+
+      {/* 原有补充卡片 */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {stats.centers && stats.centers.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm">🏛</span>
+                  职能中心上传分布
+                </CardTitle>
+              </CardHeader>
+              <CardContent><DonutChart items={stats.centers} /></CardContent>
+            </Card>
+          )}
+
+          {stats.datacenters && stats.datacenters.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm">🖥</span>
+                  数据中心上传分布
+                </CardTitle>
+              </CardHeader>
+              <CardContent><RankBar items={stats.datacenters.slice(0, 10)} valueKey="count" labelKey="name" colorIndex={1} /></CardContent>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -784,21 +1144,54 @@ export function SimpleApp() {
     finally { setIsLoading(false) }
   }
 
-  async function handle搜索(query: string, page = 0) {
+  // 搜索筛选状态
+  const [searchFilters, setSearchFilters] = useState<{ author?: string; department?: string; tag?: string }>({})
+
+  async function handle搜索(query: string, filters?: { author?: string; department?: string; tag?: string }) {
     // 保存搜索关键词，用于翻页时保持搜索状态
     if (query.trim()) setSearchQuery(query)
-    if (!searchQuery && !query.trim()) { loadSkills(page); return }
+    // 保存筛选条件
+    if (filters) setSearchFilters(filters)
+    const effectiveFilters = filters || searchFilters
     const q = query.trim() || searchQuery
+    // 无关键词且无筛选条件时，回到列表模式
+    if (!q && !effectiveFilters.author && !effectiveFilters.department && !effectiveFilters.tag) { 
+      loadSkills(0); return 
+    }
     try {
       setIsLoading(true)
-      setCurrentPage(page)
-      const result = await searchSkills(q)
+      setCurrentPage(0)
+      const result = await searchSkills(q, effectiveFilters)
       let results = result.data.content
+      // 本地标签筛选（与后端筛选叠加）
       const filterTags = getFilterTags()
       if (filterTags.length > 0) {
         results = results.filter(s => filterTags.some(t => (s.tags || []).includes(t)))
       }
       // 本地分页
+      const total = results.length
+      setTotalPages(Math.max(1, Math.ceil(total / PAGE_SIZE)))
+      setSkills(results.slice(0, PAGE_SIZE))
+    }
+    catch (err) { setError('搜索 failed: ' + (err as Error).message) }
+    finally { setIsLoading(false) }
+  }
+
+  async function handle搜索翻页(page: number) {
+    const q = searchQuery
+    const effectiveFilters = searchFilters
+    if (!q && !effectiveFilters.author && !effectiveFilters.department && !effectiveFilters.tag) { 
+      loadSkills(page); return 
+    }
+    try {
+      setIsLoading(true)
+      setCurrentPage(page)
+      const result = await searchSkills(q, effectiveFilters)
+      let results = result.data.content
+      const filterTags = getFilterTags()
+      if (filterTags.length > 0) {
+        results = results.filter(s => filterTags.some(t => (s.tags || []).includes(t)))
+      }
       const total = results.length
       setTotalPages(Math.max(1, Math.ceil(total / PAGE_SIZE)))
       setSkills(results.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE))
@@ -901,7 +1294,7 @@ export function SimpleApp() {
             <div className="space-y-6">
               <div className="text-center py-8">
                 <h2 className="text-3xl font-bold text-gray-900 mb-4">发现与分享技能</h2>
-                <div className="max-w-2xl mx-auto"><SearchBar onSearch={handle搜索} /></div>
+                <div className="max-w-2xl mx-auto"><SearchBar onSearch={handle搜索} availableTags={SKILL_TAGS} /></div>
                 {/* 一级标签 */}
                 <div className="max-w-2xl mx-auto mt-4 flex flex-wrap justify-center gap-2">
                   {SKILL_TAGS.map(tag => (
@@ -945,9 +1338,9 @@ export function SimpleApp() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{skills.map(skill => <SimpleSkillCard key={skill.id} skill={skill} onClick={() => handleSkillClick(skill.slug)} onDelete={(e) => handleDeleteSkill(e, skill.slug)} />)}</div>
                   {totalPages > 1 && (
                     <div className="flex items-center justify-center gap-3 py-4">
-                      <Button variant="outline" size="sm" onClick={() => handle搜索('', currentPage - 1)} disabled={currentPage <= 0}>上一页</Button>
+                      <Button variant="outline" size="sm" onClick={() => handle搜索翻页(currentPage - 1)} disabled={currentPage <= 0}>上一页</Button>
                       <span className="px-4 py-1.5 rounded-lg bg-gray-100 text-sm font-medium">第 {currentPage + 1} / {totalPages} 页</span>
-                      <Button variant="outline" size="sm" onClick={() => handle搜索('', currentPage + 1)} disabled={currentPage >= totalPages - 1}>下一页</Button>
+                      <Button variant="outline" size="sm" onClick={() => handle搜索翻页(currentPage + 1)} disabled={currentPage >= totalPages - 1}>下一页</Button>
                     </div>
                   )}
                 </>

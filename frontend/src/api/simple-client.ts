@@ -54,8 +54,61 @@ export interface ApiResponse<T> {
 
 export interface StatsData {
   skills: { name: string; slug: string; downloads: number; views: number }[];
+  regions: { id: string; name: string; count: number }[];
+  datacenters: { name: string; count: number }[];
+  centers: { name: string; count: number }[];
+  unmapped_departments: { name: string; count: number }[];
   departments: { name: string; count: number }[];
   developers: { name: string; count: number }[];
+  overview?: {
+    skills_total: number;
+    versions_total: number;
+    authors_total: number;
+    departments_total: number;
+    tags_total: number;
+    pending_total: number;
+  };
+}
+
+// KPI 数据
+export interface KpiData {
+  today: { skills_total: number; downloads: number; views: number; searches: number; unique_users: number };
+  yesterday: { skills_total: number; downloads: number; views: number; searches: number; unique_users: number };
+  this_week: { skills_total: number; downloads: number; views: number; searches: number; unique_users: number };
+  this_month: { skills_total: number; downloads: number; views: number; searches: number; unique_users: number };
+}
+
+// 趋势数据
+export interface TrendData {
+  dates: string[];
+  series: {
+    views: number[];
+    downloads: number[];
+    publishes: number[];
+    searches: number[];
+    unique_users: number[];
+  };
+}
+
+// 实时事件
+export interface RealtimeEvent {
+  id: string;
+  type: string;
+  user: string;
+  description: string;
+  timestamp: string;
+  metadata: Record<string, any>;
+}
+
+// 搜索分析
+export interface SearchAnalysis {
+  period_days: number;
+  total_searches: number;
+  zero_result_count: number;
+  zero_result_rate: number;
+  unique_queries?: number;
+  top_queries: { query: string; count: number }[];
+  zero_result_queries: { query: string; count: number }[];
 }
 
 export interface AuditLog {
@@ -94,9 +147,18 @@ export async function getSkill(slug: string): Promise<ApiResponse<SkillDetail>> 
   return response.json();
 }
 
-// 搜索技能
-export async function searchSkills(q: string): Promise<ApiResponse<{ content: Skill[]; totalElements: number }>> {
-  const response = await fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`);
+// 搜索技能（支持按作者、部门、标签筛选）
+export async function searchSkills(
+  q: string,
+  filters?: { author?: string; department?: string; tag?: string }
+): Promise<ApiResponse<{ content: Skill[]; totalElements: number }>> {
+  const params = new URLSearchParams();
+  params.set('q', q);
+  if (filters?.author) params.set('author', filters.author);
+  if (filters?.department) params.set('department', filters.department);
+  if (filters?.tag) params.set('tag', filters.tag);
+  
+  const response = await fetch(`${API_BASE}/search?${params}`);
   if (!response.ok) throw new Error('Failed to search skills');
   return response.json();
 }
@@ -157,10 +219,38 @@ export async function recordView(slug: string): Promise<ApiResponse<{ success: b
   return response.json();
 }
 
-// 获取统计数据
+// 获取统计数据（原始）
 export async function getStats(): Promise<ApiResponse<StatsData>> {
   const response = await fetch(`${API_BASE}/stats`);
   if (!response.ok) throw new Error('Failed to fetch stats');
+  return response.json();
+}
+
+// 获取KPI汇总
+export async function getKpi(): Promise<ApiResponse<KpiData>> {
+  const response = await fetch(`${API_BASE}/stats/kpi`);
+  if (!response.ok) throw new Error('Failed to fetch KPI');
+  return response.json();
+}
+
+// 获取趋势数据
+export async function getTrend(days: number = 30): Promise<ApiResponse<TrendData>> {
+  const response = await fetch(`${API_BASE}/stats/trend?days=${days}`);
+  if (!response.ok) throw new Error('Failed to fetch trend');
+  return response.json();
+}
+
+// 获取实时活动流
+export async function getRealtimeEvents(limit: number = 20): Promise<ApiResponse<RealtimeEvent[]>> {
+  const response = await fetch(`${API_BASE}/stats/realtime?limit=${limit}`);
+  if (!response.ok) throw new Error('Failed to fetch realtime events');
+  return response.json();
+}
+
+// 获取搜索分析
+export async function getSearchAnalysis(days: number = 7): Promise<ApiResponse<SearchAnalysis>> {
+  const response = await fetch(`${API_BASE}/stats/search-analysis?days=${days}`);
+  if (!response.ok) throw new Error('Failed to fetch search analysis');
   return response.json();
 }
 

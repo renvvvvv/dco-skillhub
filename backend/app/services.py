@@ -180,29 +180,49 @@ def generate_slug(name: str) -> str:
 
 
 def update_search_index(skill: dict):
-    """更新搜索索引"""
+    """更新搜索索引（含作者、部门、标签信息）"""
     def updater(data):
         index = data.get("index", {})
         
         # 提取关键词（中英文分词）
+        # 包含：名称、描述、作者名、作者部门、作者组织、标签
         text = f"{skill.get('name', '')} {skill.get('description', '')}"
+        author_name = skill.get('author_name', '')
+        author_department = skill.get('author_department', '')
+        author_organization = skill.get('author_organization', '')
+        tags = ' '.join(skill.get('tags', []))
+        
+        # 构建完整搜索文本
+        full_text = f"{text} {author_name} {author_department} {author_organization} {tags}"
+        
+        words = set()
         
         # 英文按空格分词
-        words = set()
-        for word in text.lower().split():
+        for word in full_text.lower().split():
             words.add(word)
             # 添加子串（前缀匹配）
             for i in range(2, len(word) + 1):
                 words.add(word[:i])
         
         # 中文按字符分词
-        for char in text:
+        for char in full_text:
             if '\u4e00' <= char <= '\u9fff':  # 中文字符
                 words.add(char)
+        
+        # 单独添加作者名、部门、标签的完整词（支持精确搜索）
+        for field in [author_name, author_department, author_organization, tags]:
+            if field:
+                words.add(field.lower())
+                # 中文短语拆分
+                for i in range(len(field)):
+                    for j in range(i + 2, min(i + 10, len(field) + 1)):
+                        words.add(field[i:j].lower())
         
         # 更新索引
         skill_id = skill["id"]
         for word in words:
+            if not word.strip():
+                continue
             if word not in index:
                 index[word] = []
             if skill_id not in index[word]:
@@ -213,9 +233,16 @@ def update_search_index(skill: dict):
     search_db.update(updater)
 
 
-def search_skills(query: str) -> List[dict]:
-    """搜索技能"""
-    if not query.strip():
+def search_skills(query: str, filter_author: str = None, filter_department: str = None, filter_tag: str = None) -> List[dict]:
+    """搜索技能（支持按作者、部门、标签筛选）
+    
+    Args:
+        query: 搜索关键词（匹配名称、描述、作者、部门）
+        filter_author: 按作者名筛选（精确匹配）
+        filter_department: 按部门筛选（精确匹配）
+        filter_tag: 按标签筛选（精确匹配）
+    """
+    if not query.strip() and not filter_author and not filter_department and not filter_tag:
         return []
     
     # 读取数据
@@ -225,19 +252,48 @@ def search_skills(query: str) -> List[dict]:
     skills = {s["id"]: s for s in skills_data.get("skills", [])}
     index = search_data.get("index", {})
     
-    # 分词搜索
-    query_words = query.lower().split()
-    matched_ids = set()
+    matched_ids = set(skills.keys())
     
-    for word in query_words:
-        # 精确匹配
-        if word in index:
-            matched_ids.update(index[word])
+    # 关键词搜索
+    if query.strip():
+        query_words = query.lower().split()
+        word_matched = set()
         
-        # 前缀匹配
-        for key, ids in index.items():
-            if key.startswith(word):
-                matched_ids.update(ids)
+        for word in query_words:
+            # 精确匹配
+            if word in index:
+                word_matched.update(index[word])
+            
+            # 前缀匹配
+            for key, ids in index.items():
+                if key.startswith(word):
+                    word_matched.update(ids)
+        
+        matched_ids = matched_ids & word_matched if word_matched else matched_ids
+    
+    # 作者筛选
+    if filter_author:
+        author_matched = {
+            sid for sid, s in skills.items()
+            if filter_author.lower() in s.get("author_name", "").lower()
+        }
+        matched_ids = matched_ids & author_matched
+    
+    # 部门筛选
+    if filter_department:
+        dept_matched = {
+            sid for sid, s in skills.items()
+            if filter_department.lower() in s.get("author_department", "").lower()
+        }
+        matched_ids = matched_ids & dept_matched
+    
+    # 标签筛选
+    if filter_tag:
+        tag_matched = {
+            sid for sid, s in skills.items()
+            if any(filter_tag.lower() in t.lower() for t in s.get("tags", []))
+        }
+        matched_ids = matched_ids & tag_matched
     
     # 按下载量排序
     results = [skills[sid] for sid in matched_ids if sid in skills]
