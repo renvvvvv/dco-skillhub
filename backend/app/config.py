@@ -107,7 +107,7 @@ METRIC_STANDARDS = {
 }
 
 # 应用配置
-APP_NAME = "SkillHub Lite"
+APP_NAME = "随航守卫"
 APP_VERSION = "1.0.0"
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 ALLOWED_EXTENSIONS = {".zip"}

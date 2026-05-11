@@ -66,7 +66,7 @@ from app.metrics import (
 )
 
 app = FastAPI(
-    title="SkillHub Lite", version="1.0.0", docs_url="/api/docs", redoc_url="/api/redoc"
+    title="随航守卫", version="1.0.0", docs_url="/api/docs", redoc_url="/api/redoc"
 )
 
 # CORS 配置

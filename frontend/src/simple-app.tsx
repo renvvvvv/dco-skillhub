@@ -506,7 +506,7 @@ function StatsView() {
       {/* 头部 */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">SkillHub 运营驾驶舱</h2>
+          <h2 className="text-2xl font-bold text-gray-900">随航守卫 运营驾驶舱</h2>
           <p className="text-sm text-gray-500 mt-1">实时监控技能市场运营数据</p>
         </div>
         <div className="flex bg-gray-100 rounded-lg p-1">
@@ -1281,7 +1281,10 @@ export function SimpleApp() {
       <header className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <h1 onClick={() => setCurrentView('start')} className="text-xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent cursor-pointer">DCO SkillHub</h1>
+            <h1 onClick={() => setCurrentView('start')} className="text-xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent cursor-pointer flex items-center gap-2">
+              <img src="/logo.jpg" alt="随航守卫" className="h-8 w-8 rounded-lg object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+              随航守卫
+            </h1>
             <nav className="hidden sm:flex bg-gray-100/80 p-1 rounded-xl">
               {[{ key: 'start', label: '开始' }, { key: 'home', label: '浏览' }, { key: 'publish', label: '发布' }, { key: 'stats', label: '展示' }, { key: 'admin', label: '上线与管理' }, { key: 'webhook', label: 'Webhook日志' }].map((item) => (
                 <button key={item.key} onClick={() => item.key === 'admin' ? handleAdminClick() : item.key === 'webhook' ? handleWebhookClick() : setCurrentView(item.key as any)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${currentView === item.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{item.label}</button>
