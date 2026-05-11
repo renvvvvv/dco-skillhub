@@ -46,7 +46,7 @@ export function StartPage({ onEnter }: { onEnter: () => void }) {
             <span className="text-sm font-medium text-gray-700">运维事业部 · 数智中心</span>
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-            <span className="text-gray-800">DCO SkillHub</span>
+            <span className="text-gray-800">随航守卫</span>
             <br />
             <span className="bg-gradient-to-r from-pink-400 via-purple-400 to-pink-500 bg-clip-text text-transparent">
               智能运维复利增长新引擎
@@ -75,7 +75,7 @@ export function StartPage({ onEnter }: { onEnter: () => void }) {
               className="px-8 py-4 bg-gradient-to-r from-pink-400 via-purple-400 to-pink-500 text-white font-semibold rounded-2xl shadow-lg shadow-pink-200 hover:shadow-xl hover:shadow-pink-300 transition-all duration-300 hover:-translate-y-1 inline-flex items-center gap-2"
             >
               <span>🚀</span>
-              <span>进入 DCO SkillHub</span>
+              <span>进入 随航守卫</span>
             </button>
             <button className="px-8 py-4 bg-white text-gray-700 font-semibold rounded-2xl border border-gray-200 hover:border-pink-300 hover:bg-pink-50 transition-all duration-300">
               了解更多
@@ -182,7 +182,7 @@ export function StartPage({ onEnter }: { onEnter: () => void }) {
               Growth Path
             </div>
             <h2 className="text-3xl font-bold text-gray-800 mb-4">运维工程师成长路径</h2>
-            <p className="text-gray-600">DCO SkillHub 陪伴你从入门到专家，每一步都有 AI 加持</p>
+            <p className="text-gray-600">随航守卫 陪伴你从入门到专家，每一步都有 AI 加持</p>
           </div>
           <div className="relative">
             <div className="hidden md:block absolute top-6 left-[10%] right-[10%] h-0.5 bg-gradient-to-r from-pink-200 via-rose-200 to-pink-200" />
@@ -212,14 +212,14 @@ export function StartPage({ onEnter }: { onEnter: () => void }) {
             <div className="relative z-10">
               <h2 className="text-3xl font-bold text-gray-800 mb-4">开启你的智能运维之旅</h2>
               <p className="text-gray-600 mb-8 max-w-lg mx-auto">
-                加入 DCO SkillHub，与全事业部的运维精英一起，用 AI 重塑运维生产力
+                加入 随航守卫，与全事业部的运维精英一起，用 AI 重塑运维生产力
               </p>
               <button 
                 onClick={onEnter}
                 className="px-8 py-4 bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500 text-white font-semibold rounded-2xl shadow-lg shadow-pink-200 hover:shadow-xl hover:shadow-pink-300 transition-all duration-300 hover:-translate-y-1 inline-flex items-center gap-2"
               >
                 <span>🚀</span>
-                <span>立即进入 DCO SkillHub</span>
+                <span>立即进入 随航守卫</span>
               </button>
             </div>
           </div>
@@ -229,7 +229,7 @@ export function StartPage({ onEnter }: { onEnter: () => void }) {
       {/* Footer */}
       <footer className="relative py-8 px-4 text-center border-t border-pink-100">
         <p className="text-gray-500 text-sm">运维事业部 · 数智中心 | 让运维更智能，让成长更高效</p>
-        <p className="text-gray-400 text-xs mt-2">© 2026 DCO SkillHub. Powered by <span className="text-pink-500 font-medium">数智中心</span></p>
+        <p className="text-gray-400 text-xs mt-2">© 2026 随航守卫. Powered by <span className="text-pink-500 font-medium">数智中心</span></p>
       </footer>
     </div>
   )
