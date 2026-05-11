@@ -318,6 +318,95 @@ export function getDownloadUrl(slug: string, version?: string): string {
   return `${API_BASE}/skills/${slug}/download`;
 }
 
+// Webhook 日志相关接口
+export interface WebhookLog {
+  id: string;
+  type: string;
+  status: string;
+  webhook_url: string;
+  request_body: any;
+  response_body: any;
+  response_code: number;
+  error_message: string;
+  duration_ms: number;
+  timestamp: string;
+  report_data?: any;
+  card_template?: string;
+}
+
+// 获取 Webhook 日志列表
+export async function getWebhookLogs(token: string, params?: { type?: string; status?: string; page?: number; size?: number }): Promise<ApiResponse<PageResponse<WebhookLog>>> {
+  const query = new URLSearchParams();
+  if (params?.type) query.set('type', params.type);
+  if (params?.status) query.set('status', params.status);
+  if (params?.page !== undefined) query.set('page', String(params.page));
+  if (params?.size !== undefined) query.set('size', String(params.size));
+  
+  const response = await fetch(`${API_BASE}/admin/webhook-logs?${query}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to fetch webhook logs');
+  return response.json();
+}
+
+// 获取 Webhook 日志详情
+export async function getWebhookLogDetail(token: string, id: string): Promise<ApiResponse<WebhookLog>> {
+  const response = await fetch(`${API_BASE}/admin/webhook-logs/${id}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to fetch webhook log detail');
+  return response.json();
+}
+
+// 获取 Webhook 统计
+export async function getWebhookStats(token: string): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/admin/webhook-logs/stats`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to fetch webhook stats');
+  return response.json();
+}
+
+// 测试发送 Webhook
+export async function testWebhook(token: string): Promise<ApiResponse<WebhookLog>> {
+  const response = await fetch(`${API_BASE}/admin/webhook-logs/test`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to test webhook');
+  return response.json();
+}
+
+// 重试 Webhook
+export async function retryWebhook(token: string, id: string): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/admin/webhook-logs/${id}/retry`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to retry webhook');
+  return response.json();
+}
+
+// 手动发送日报
+export async function sendDailyReport(token: string): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/admin/send-daily-report`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to send daily report');
+  return response.json();
+}
+
+// 手动发送周报
+export async function sendWeeklyReport(token: string): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/admin/send-weekly-report`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error('Failed to send weekly report');
+  return response.json();
+}
+
 // 健康检查
 export async function healthCheck(): Promise<{ status: string; version: string }> {
   const response = await fetch('/health');

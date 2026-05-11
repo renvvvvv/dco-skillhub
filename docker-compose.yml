@@ -2,12 +2,12 @@ version: '3.8'
 
 services:
   nginx:
-    image: doc-skillhub-nginx:new
+    image: nginx:alpine
     ports:
       - "8088:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/html:/usr/share/nginx/html:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
       - backend_storage:/app/storage:ro
     depends_on:
       - backend
@@ -22,6 +22,10 @@ services:
       - backend_storage:/app/storage
     environment:
       - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    dns:
+      - 8.8.8.8
+      - 114.114.114.114
     restart: unless-stopped
 
 volumes:

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getSkills, searchSkills, getSkill, publishSkill, updateSkill, deleteSkill, recordView, getStats, getKpi, getTrend, getRealtimeEvents, getSearchAnalysis, adminLogin, getPending, approveSkill, getAuditLogs, Skill, SkillDetail, StatsData, KpiData, TrendData, RealtimeEvent, SearchAnalysis, AuditLog } from './api/simple-client'
+import { WebhookLogView } from './components/webhook-log-view'
 import { UploadZone } from './features/publish/upload-zone'
 import { SearchBar } from './features/search/search-bar'
 import { Button } from './shared/ui/button'
@@ -1093,7 +1094,7 @@ function SimpleSkillCard({ skill, onClick, onDelete }: { skill: Skill; onClick: 
 
 // Main App
 export function SimpleApp() {
-  const [currentView, setCurrentView] = useState<'start' | 'home' | 'publish' | 'detail' | 'stats' | 'admin'>('start')
+  const [currentView, setCurrentView] = useState<'start' | 'home' | 'publish' | 'detail' | 'stats' | 'admin' | 'webhook'>('start')
   const [skills, setSkills] = useState<Skill[]>([])
   const [selectedSkill, setSelectedSkill] = useState<SkillDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -1267,6 +1268,14 @@ export function SimpleApp() {
     setCurrentView('home')
   }
 
+  function handleWebhookClick() {
+    if (adminToken) {
+      setCurrentView('webhook')
+    } else {
+      setShowAdminLogin(true)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50">
@@ -1274,13 +1283,13 @@ export function SimpleApp() {
           <div className="flex justify-between items-center h-16">
             <h1 onClick={() => setCurrentView('start')} className="text-xl font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent cursor-pointer">DCO SkillHub</h1>
             <nav className="hidden sm:flex bg-gray-100/80 p-1 rounded-xl">
-              {[{ key: 'start', label: '开始' }, { key: 'home', label: '浏览' }, { key: 'publish', label: '发布' }, { key: 'stats', label: '展示' }, { key: 'admin', label: '上线与管理' }].map((item) => (
-                <button key={item.key} onClick={() => item.key === 'admin' ? handleAdminClick() : setCurrentView(item.key as any)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${currentView === item.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{item.label}</button>
+              {[{ key: 'start', label: '开始' }, { key: 'home', label: '浏览' }, { key: 'publish', label: '发布' }, { key: 'stats', label: '展示' }, { key: 'admin', label: '上线与管理' }, { key: 'webhook', label: 'Webhook日志' }].map((item) => (
+                <button key={item.key} onClick={() => item.key === 'admin' ? handleAdminClick() : item.key === 'webhook' ? handleWebhookClick() : setCurrentView(item.key as any)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${currentView === item.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{item.label}</button>
               ))}
             </nav>
             <div className="sm:hidden">
-              <select value={currentView} onChange={(e) => { const v = e.target.value; v === 'admin' ? handleAdminClick() : setCurrentView(v as any) }} className="bg-gray-100 border-0 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-pink-500">
-                <option value="start">开始</option><option value="home">浏览</option><option value="publish">发布</option><option value="stats">展示</option><option value="admin">上线与管理</option>
+              <select value={currentView} onChange={(e) => { const v = e.target.value; v === 'admin' ? handleAdminClick() : v === 'webhook' ? handleWebhookClick() : setCurrentView(v as any) }} className="bg-gray-100 border-0 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-pink-500">
+                <option value="start">开始</option><option value="home">浏览</option><option value="publish">发布</option><option value="stats">展示</option><option value="admin">上线与管理</option><option value="webhook">Webhook日志</option>
               </select>
             </div>
           </div>
@@ -1366,6 +1375,11 @@ export function SimpleApp() {
         {currentView === 'admin' && adminToken && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <AdminView onLogout={handleAdminLogout} />
+          </div>
+        )}
+        {currentView === 'webhook' && adminToken && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <WebhookLogView token={adminToken} />
           </div>
         )}
       </main>
