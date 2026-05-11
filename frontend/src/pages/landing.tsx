@@ -91,10 +91,12 @@ export function LandingPage() {
     <>
       {/* Hero Section */}
       <main ref={heroView.ref} className={`relative z-10 flex flex-col items-center pt-16 pb-20 px-4 md:pt-24 scroll-fade-up${heroView.inView ? ' in-view' : ''}`}>
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-brand-gradient mb-4 flex items-center justify-center gap-4">
-          <img src="/logo.jpg" alt="随航守卫" className="h-16 w-16 md:h-20 md:w-20 rounded-xl object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
-          随航守卫
-        </h1>
+        <img 
+          src="/logo.jpg" 
+          alt="随航守卫" 
+          className="h-24 w-auto md:h-32 rounded-xl object-contain mb-6" 
+          onError={(e) => { e.currentTarget.style.display = 'none' }} 
+        />
         <h2
           className="text-xl md:text-2xl font-semibold tracking-tight text-center mb-3"
           style={{ color: 'hsl(var(--foreground))' }}

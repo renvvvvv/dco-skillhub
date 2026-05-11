@@ -72,9 +72,8 @@ export function Layout() {
 
       {/* Header */}
       <header className={getAppHeaderClassName(isHeaderElevated)} style={{ borderColor: 'hsl(var(--border))' }}>
-        <Link to="/" className="text-xl font-semibold tracking-tight text-brand-gradient flex items-center gap-2">
-          <img src="/logo.jpg" alt="随航守卫" className="h-8 w-8 rounded-lg object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
-          随航守卫
+        <Link to="/" className="flex items-center">
+          <img src="/logo.jpg" alt="随航守卫" className="h-10 w-auto rounded-lg object-contain" onError={(e) => { e.currentTarget.style.display = 'none' }} />
         </Link>
 
         <nav className="hidden md:flex items-center gap-8 text-[15px] font-normal" style={{ color: 'hsl(var(--text-secondary))' }}>
@@ -137,9 +136,8 @@ export function Layout() {
         <div className="max-w-6xl mx-auto px-6 md:px-12 py-10">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10 md:gap-12">
             <div className="flex-shrink-0">
-              <div className="flex items-center gap-2 mb-3">
-                <img src="/logo.jpg" alt="随航守卫" className="w-9 h-9 rounded-lg object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
-                <span className="text-lg font-bold text-brand-gradient">随航守卫</span>
+              <div className="mb-3">
+                <img src="/logo.jpg" alt="随航守卫" className="h-12 w-auto rounded-lg object-contain" onError={(e) => { e.currentTarget.style.display = 'none' }} />
               </div>
               <p className="text-sm max-w-xs" style={{ color: 'hsl(var(--text-secondary))' }}>
                 {t('layout.footerDescription')}
