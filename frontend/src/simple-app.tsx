@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react'
-import { getSkills, searchSkills, getSkill, publishSkill, updateSkill, deleteSkill, recordView, getStats, getKpi, getTrend, getRealtimeEvents, getSearchAnalysis, adminLogin, getPending, approveSkill, getAuditLogs, trackEvent, Skill, SkillDetail, StatsData, KpiData, TrendData, RealtimeEvent, SearchAnalysis, AuditLog } from './api/simple-client'
+import { getSkills, searchSkills, getSkill, publishSkill, updateSkill, deleteSkill, recordView, getStats, getKpi, getTrend, getRealtimeEvents, getSearchAnalysis, adminLogin, getPending, approveSkill, getAuditLogs, trackEvent, getSkillStats, Skill, SkillDetail, StatsData, KpiData, TrendData, RealtimeEvent, SearchAnalysis, AuditLog } from './api/simple-client'
 import { WebhookLogView } from './components/webhook-log-view'
 import { ArenaPage } from './components/arena-page'
+import { SkillRating } from './components/skill-rating'
+import { SkillInteractions } from './components/skill-interactions'
+import { useSkillDuration } from './hooks/use-skill-duration'
+import { ExpertReviewManager } from './components/expert-review-manager'
+import { AdminLogViewer } from './components/admin-log-viewer'
+import { WeeklyPicksManager } from './components/weekly-picks-manager'
 import { UploadZone } from './features/publish/upload-zone'
 import { SearchBar } from './features/search/search-bar'
 import { Button } from './shared/ui/button'
@@ -718,7 +724,7 @@ function AdminLoginDialog({ isOpen, onLogin, onClose }: { isOpen: boolean; onLog
 
 // 管理控制台组件
 function AdminView({ onLogout }: { onLogout: () => void }) {
-  const [activeTab, setActiveTab] = useState<'pending' | 'logs'>('pending')
+  const [activeTab, setActiveTab] = useState<'pending' | 'logs' | 'newlogs' | 'expert' | 'weekly-picks'>('pending')
   const [pendingSkills, setPendingSkills] = useState<Skill[]>([])
   const [pendingVersions, setPendingVersions] = useState<any[]>([])
   const [logs, setLogs] = useState<AuditLog[]>([])
@@ -790,6 +796,9 @@ function AdminView({ onLogout }: { onLogout: () => void }) {
       <div className="flex gap-2 border-b pb-2">
         <button onClick={() => setActiveTab('pending')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'pending' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>📋 待审核</button>
         <button onClick={() => setActiveTab('logs')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'logs' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>📝 日志查询</button>
+        <button onClick={() => setActiveTab('newlogs')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'newlogs' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>📊 新日志系统</button>
+        <button onClick={() => setActiveTab('expert')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'expert' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>👨‍💼 专家评审</button>
+        <button onClick={() => setActiveTab('weekly-picks')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'weekly-picks' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>⭐ 小智优选</button>
       </div>
 
       {isLoading && <div className="text-center py-12"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500 mx-auto"></div></div>}
@@ -905,6 +914,15 @@ function AdminView({ onLogout }: { onLogout: () => void }) {
             </CardContent>
           </Card>
         </div>
+      )}
+      {activeTab === 'newlogs' && (
+        <AdminLogViewer token="admin" />
+      )}
+      {activeTab === 'expert' && (
+        <ExpertReviewManager token="admin" />
+      )}
+      {activeTab === 'weekly-picks' && (
+        <WeeklyPicksManager />
       )}
       {editingSkill && (
         <编辑SkillDialog
@@ -1510,6 +1528,20 @@ function 发布View({ onSuccess }: { onSuccess: () => void }) {
 
 // Detail View with 下载 and 更新 Buttons
 function DetailView({ skill, on返回, on更新, on编辑 }: { skill: SkillDetail; on返回: () => void; on更新: () => void; on编辑: () => void }) {
+  // 使用时长追踪
+  useSkillDuration(skill.slug);
+  
+  // Skill统计数据
+  const [skillStats, setSkillStats] = useState<any>(null);
+  
+  useEffect(() => {
+    getSkillStats(skill.slug).then(res => {
+      if (res.success) {
+        setSkillStats(res.data);
+      }
+    }).catch(() => {});
+  }, [skill.slug]);
+  
   return (
     <div className="space-y-6">
       <Button variant="ghost" onClick={on返回}>← 返回</Button>
@@ -1552,6 +1584,16 @@ function DetailView({ skill, on返回, on更新, on编辑 }: { skill: SkillDetai
         </CardHeader>
         <CardContent className="space-y-6">
           <p className="text-gray-600 text-lg">{skill.description || '暂无描述'}</p>
+          
+          {/* 互动按钮 */}
+          {skill.status === 'approved' && (
+            <SkillInteractions 
+              slug={skill.slug}
+              initialFavorites={skillStats?.total_favorites || 0}
+              initialShares={skillStats?.total_shares || 0}
+            />
+          )}
+          
           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 bg-gray-50 p-4 rounded-xl">
             <span className="flex items-center gap-2"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>作者: {skill.author_name}</span>
             {/* @ts-ignore */}
@@ -1561,6 +1603,22 @@ function DetailView({ skill, on返回, on更新, on编辑 }: { skill: SkillDetai
             <span className="flex items-center gap-2"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>下载: {skill.download_count}</span>
           </div>
           <TagDisplay tags={skill.tags} />
+          
+          {/* 评分组件 */}
+          {skill.status === 'approved' && (
+            <SkillRating 
+              slug={skill.slug}
+              avgRating={skillStats?.avg_rating || 0}
+              ratingCount={skillStats?.total_ratings || 0}
+              onRatingSubmitted={() => {
+                // 刷新统计数据
+                getSkillStats(skill.slug).then(res => {
+                  if (res.success) setSkillStats(res.data);
+                });
+              }}
+            />
+          )}
+          
           {skill.versions && skill.versions.length > 0 && (
             <div>
               <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>版本号 History</h3>

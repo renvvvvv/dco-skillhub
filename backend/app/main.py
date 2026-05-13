@@ -65,6 +65,9 @@ from app.metrics import (
     aggregate_daily,
     aggregate_all_missing,
 )
+from app.expert_db import expert_db
+from app.code_quality import analyze_skill_package, code_checker
+from app.weekly_picks_db import weekly_picks_db
 
 app = FastAPI(
     title="随航守卫", version="1.0.0", docs_url="/api/docs", redoc_url="/api/redoc"
@@ -2249,13 +2252,11 @@ def get_skill_stats(slug: str):
         raise HTTPException(status_code=404, detail="Skill不存在")
 
     stats = metrics_db.get_skill_stats(slug)
-    score = metrics_db.calculate_skill_score(slug, skill)
 
     return {
         "success": True,
         "data": {
             **stats,
-            **score,
             "skill_name": skill.get("name"),
             "author": skill.get("author_name"),
         },
@@ -2334,7 +2335,7 @@ def get_arena_rankings(
     elif type == "innovation":
         scored_skills = []
         for skill in approved_skills:
-            score = metrics_db.calculate_skill_score(skill.get("slug"), skill)
+            score = metrics_db.calculate_innovation_score(skill.get("slug"), skill)
             scored_skills.append(
                 {
                     "skill_name": skill.get("name"),
@@ -2356,6 +2357,305 @@ def get_arena_rankings(
     return {
         "success": True,
         "data": rankings,
+    }
+
+
+# ========== 专家评审 API ==========
+
+
+@app.post("/api/skills/{slug}/expert-review")
+async def add_expert_review(slug: str, request: Request):
+    """添加专家评审"""
+    skill = _get_skill_by_slug(slug)
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill不存在")
+
+    data = await request.json()
+    expert_id = data.get("expert_id", "anonymous")
+    expert_name = data.get("expert_name", "匿名专家")
+    dimensions = data.get("dimensions", {})
+    overall_comment = data.get("overall_comment")
+    is_recommended = data.get("is_recommended")
+
+    if not dimensions:
+        raise HTTPException(status_code=400, detail="评分维度不能为空")
+
+    review = expert_db.add_expert_review(
+        skill_id=slug,
+        expert_id=expert_id,
+        expert_name=expert_name,
+        dimensions=dimensions,
+        overall_comment=overall_comment,
+        is_recommended=is_recommended,
+    )
+
+    return {"success": True, "data": review}
+
+
+@app.get("/api/skills/{slug}/expert-reviews")
+def get_skill_expert_reviews(slug: str):
+    """获取Skill的专家评审列表"""
+    skill = _get_skill_by_slug(slug)
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill不存在")
+
+    reviews = expert_db.get_skill_reviews(slug)
+
+    return {"success": True, "data": reviews}
+
+
+@app.get("/api/admin/expert-reviews")
+def get_all_expert_reviews(limit: int = Query(100, description="返回数量")):
+    """获取所有专家评审（管理员）"""
+    reviews = expert_db.get_all_reviews(limit)
+
+    return {"success": True, "data": reviews}
+
+
+@app.get("/api/admin/expert-stats")
+def get_expert_statistics():
+    """获取专家统计信息"""
+    stats = expert_db.get_expert_stats()
+
+    return {"success": True, "data": stats}
+
+
+# ========== 用户活动日志 API ==========
+
+
+@app.post("/api/log/activity")
+async def log_activity(request: Request):
+    """记录用户活动"""
+    data = await request.json()
+    activity_type = data.get("activity_type")
+    user_id = data.get("user_id", "anonymous")
+    skill_id = data.get("skill_id")
+    details = data.get("details", {})
+    ip = request.client.host if request.client else None
+
+    if not activity_type:
+        raise HTTPException(status_code=400, detail="活动类型不能为空")
+
+    log = expert_db.log_user_activity(
+        activity_type=activity_type,
+        user_id=user_id,
+        skill_id=skill_id,
+        details=details,
+        ip=ip or "unknown",
+    )
+
+    return {"success": True, "data": log}
+
+
+@app.get("/api/admin/activity-logs")
+def get_activity_logs(
+    user_id: str = Query(None, description="用户ID"),
+    skill_id: str = Query(None, description="Skill ID"),
+    activity_type: str = Query(None, description="活动类型"),
+    days: int = Query(30, description="查询天数"),
+    limit: int = Query(100, description="返回数量"),
+):
+    """获取用户活动日志（管理员）"""
+    logs = expert_db.get_user_activity_logs(
+        user_id=user_id,
+        skill_id=skill_id,
+        activity_type=activity_type,
+        days=days,
+        limit=limit,
+    )
+
+    return {"success": True, "data": logs}
+
+
+@app.get("/api/admin/activity-summary")
+def get_activity_summary(days: int = Query(7, description="统计天数")):
+    """获取活动汇总统计"""
+    summary = expert_db.get_activity_summary(days)
+
+    return {"success": True, "data": summary}
+
+
+# ========== 代码检测 API ==========
+
+
+@app.post("/api/skills/{slug}/code-audit")
+async def audit_skill_code(slug: str):
+    """对Skill进行代码质量检测"""
+    skill = _get_skill_by_slug(slug)
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill不存在")
+
+    # 获取Skill的存储路径
+    versions_data = versions_db.read()
+    versions = versions_data.get("versions", [])
+    skill_versions = [v for v in versions if v.get("skill_id") == skill.get("id")]
+
+    if not skill_versions:
+        raise HTTPException(status_code=404, detail="Skill版本不存在")
+
+    latest_version = max(skill_versions, key=lambda x: x.get("created_at", ""))
+    storage_path = latest_version.get("storage_path")
+
+    if not storage_path:
+        raise HTTPException(status_code=404, detail="Skill文件不存在")
+
+    skill_path = STORAGE_DIR / storage_path
+
+    if not skill_path.exists():
+        raise HTTPException(status_code=404, detail="Skill文件不存在")
+
+    # 执行代码检测
+    audit_results = analyze_skill_package(skill_path)
+
+    # 记录审计日志
+    expert_db.log_code_audit(
+        skill_id=slug,
+        audit_type="automated",
+        results=audit_results,
+        score=audit_results.get("overall_score") or 0.0,
+    )
+
+    return {"success": True, "data": audit_results}
+
+
+@app.get("/api/skills/{slug}/code-audit-logs")
+def get_skill_audit_logs(slug: str, limit: int = Query(10, description="返回数量")):
+    """获取Skill的代码审计日志"""
+    logs = expert_db.get_code_audit_logs(skill_id=slug, limit=limit)
+
+    return {"success": True, "data": logs}
+
+
+@app.get("/api/admin/code-audit-logs")
+def get_all_audit_logs(limit: int = Query(100, description="返回数量")):
+    """获取所有代码审计日志（管理员）"""
+    logs = expert_db.get_code_audit_logs(limit=limit)
+
+    return {"success": True, "data": logs}
+
+
+# ========== 小智优选 API ==========
+
+
+@app.get("/api/arena/weekly-picks")
+def get_weekly_picks():
+    """获取本周精选Skill"""
+    current = weekly_picks_db.get_current_week_picks()
+
+    if not current:
+        return {
+            "success": True,
+            "data": None,
+            "message": "本周暂无精选",
+        }
+
+    # 获取Skill详细信息
+    data = skills_db.read()
+    skills = data.get("skills", [])
+
+    enriched_picks = []
+    for pick in current.get("picks", []):
+        skill = next(
+            (s for s in skills if s.get("slug") == pick.get("skill_slug")), None
+        )
+        if skill:
+            # 获取统计数据
+            stats = metrics_db.get_skill_stats(pick.get("skill_slug"))
+            enriched_picks.append(
+                {
+                    "skill_slug": pick.get("skill_slug"),
+                    "skill_name": skill.get("name"),
+                    "author": skill.get("author_name"),
+                    "department": skill.get("author_department"),
+                    "reason": pick.get("reason"),
+                    "downloads": stats.get("total_downloads", 0),
+                    "rating": stats.get("avg_rating", 0),
+                    "rating_count": stats.get("total_ratings", 0),
+                }
+            )
+
+    return {
+        "success": True,
+        "data": {
+            **current,
+            "picks": enriched_picks,
+        },
+    }
+
+
+@app.post("/api/admin/weekly-picks")
+async def set_weekly_picks(request: Request):
+    """设置本周精选（管理员）"""
+    data = await request.json()
+    picks = data.get("picks", [])
+    admin_id = data.get("admin_id", "admin")
+    admin_name = data.get("admin_name", "管理员")
+
+    if len(picks) != 3:
+        raise HTTPException(status_code=400, detail="必须选择3个Skill")
+
+    # 验证所有Skill存在
+    skills_data = skills_db.read()
+    skills = skills_data.get("skills", [])
+
+    for pick in picks:
+        skill = next(
+            (s for s in skills if s.get("slug") == pick.get("skill_slug")), None
+        )
+        if not skill:
+            raise HTTPException(
+                status_code=404, detail=f"Skill {pick.get('skill_slug')} 不存在"
+            )
+
+    result = weekly_picks_db.set_weekly_picks(
+        picks=picks,
+        admin_id=admin_id,
+        admin_name=admin_name,
+    )
+
+    return {
+        "success": True,
+        "data": result,
+    }
+
+
+@app.get("/api/admin/weekly-picks/history")
+def get_weekly_picks_history(limit: int = Query(10, description="返回数量")):
+    """获取历史精选记录"""
+    history = weekly_picks_db.get_history(limit)
+
+    # 获取Skill详细信息
+    data = skills_db.read()
+    skills = data.get("skills", [])
+
+    enriched_history = []
+    for week in history:
+        enriched_picks = []
+        for pick in week.get("picks", []):
+            skill = next(
+                (s for s in skills if s.get("slug") == pick.get("skill_slug")), None
+            )
+            if skill:
+                enriched_picks.append(
+                    {
+                        "skill_slug": pick.get("skill_slug"),
+                        "skill_name": skill.get("name"),
+                        "author": skill.get("author_name"),
+                        "department": skill.get("author_department"),
+                        "reason": pick.get("reason"),
+                    }
+                )
+
+        enriched_history.append(
+            {
+                **week,
+                "picks": enriched_picks,
+            }
+        )
+
+    return {
+        "success": True,
+        "data": enriched_history,
     }
 
 
