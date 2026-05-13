@@ -1,5 +1,6 @@
 """FastAPI 应用入口"""
 
+from typing import Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
@@ -1794,6 +1795,568 @@ async def handle_skill_command(event: dict):
         print(f"发送技能列表失败: {e}")
 
     return {"success": True}
+
+
+# ============ Skill擂台 API ============
+
+
+from app.arena_config import (
+    REWARD_TYPES,
+    EVALUATION_STATUS,
+    APPLICATION_STATUS,
+    TOTAL_BUDGET,
+)
+from app.arena_db import arena_db
+
+
+@app.get("/api/arena/config")
+def get_arena_config():
+    """获取Skill擂台配置"""
+    return {
+        "success": True,
+        "data": {
+            "reward_types": REWARD_TYPES,
+            "total_budget": TOTAL_BUDGET,
+            "status_config": EVALUATION_STATUS,
+            "application_status": APPLICATION_STATUS,
+        },
+    }
+
+
+@app.get("/api/arena/evaluations")
+def get_arena_evaluations(
+    status: Optional[str] = Query(None),
+    type: Optional[str] = Query(None),
+):
+    """获取评选列表"""
+    evaluations = arena_db.get_evaluations(status=status, type_=type)
+    return {"success": True, "data": evaluations}
+
+
+@app.get("/api/arena/evaluations/{evaluation_id}")
+def get_arena_evaluation(evaluation_id: str):
+    """获取评选详情"""
+    evaluation = arena_db.get_evaluation(evaluation_id)
+    if not evaluation:
+        raise HTTPException(status_code=404, detail="评选不存在")
+
+    # 获取该评选的申报
+    applications = arena_db.get_applications(evaluation_id=evaluation_id)
+
+    return {
+        "success": True,
+        "data": {
+            **evaluation,
+            "applications": applications,
+            "application_count": len(applications),
+        },
+    }
+
+
+@app.get("/api/arena/statistics")
+def get_arena_statistics():
+    """获取统计数据"""
+    stats = arena_db.get_statistics()
+    return {"success": True, "data": stats}
+
+
+@app.get("/api/arena/leaderboard")
+def get_arena_leaderboard(
+    evaluation_id: Optional[str] = Query(None),
+    type: Optional[str] = Query(None),
+):
+    """获取排行榜"""
+    if evaluation_id:
+        evaluation = arena_db.get_evaluation(evaluation_id)
+        if not evaluation:
+            raise HTTPException(status_code=404, detail="评选不存在")
+        applications = arena_db.get_applications(
+            evaluation_id=evaluation_id, status="approved"
+        )
+    else:
+        # 获取所有已通过的申报
+        applications = []
+        for eval_ in arena_db.get_evaluations():
+            apps = arena_db.get_applications(
+                evaluation_id=eval_["id"], status="approved"
+            )
+            applications.extend(apps)
+
+    # 按奖励金额排序
+    applications.sort(key=lambda x: x.get("reward", 0), reverse=True)
+
+    return {
+        "success": True,
+        "data": {
+            "ranking": applications[:50],
+            "total": len(applications),
+        },
+    }
+
+
+@app.get("/api/arena/my-applications")
+def get_my_applications(request: Request):
+    """获取我的申报"""
+    # 简化：使用IP作为用户标识
+    user = get_client_ip(request)
+    applications = arena_db.get_applications(user=user)
+    return {"success": True, "data": applications}
+
+
+@app.post("/api/arena/apply")
+def apply_for_arena(
+    request: Request,
+    skill_id: str = Form(...),
+    evaluation_id: str = Form(...),
+    description: str = Form(""),
+):
+    """申报技能参评"""
+    user = get_client_ip(request)
+
+    # 检查评选是否存在
+    evaluation = arena_db.get_evaluation(evaluation_id)
+    if not evaluation:
+        raise HTTPException(status_code=404, detail="评选不存在")
+
+    # 检查评选状态
+    if evaluation.get("status") != "open":
+        raise HTTPException(status_code=400, detail="该评选未开放申报")
+
+    # 检查技能是否存在
+    skills_data = skills_db.read()
+    skill = next(
+        (s for s in skills_data.get("skills", []) if s["id"] == skill_id), None
+    )
+    if not skill:
+        raise HTTPException(status_code=404, detail="技能不存在")
+
+    # 检查是否已申报
+    existing = arena_db.get_applications(evaluation_id=evaluation_id)
+    if any(a.get("skill_id") == skill_id for a in existing):
+        raise HTTPException(status_code=409, detail="该技能已申报")
+
+    # 创建申报
+    application = arena_db.create_application(
+        {
+            "skill_id": skill_id,
+            "skill_name": skill.get("name", ""),
+            "evaluation_id": evaluation_id,
+            "evaluation_type": evaluation.get("type", ""),
+            "author": user,
+            "author_name": skill.get("author_name", ""),
+            "department": skill.get("author_department", ""),
+            "description": description,
+            "status": "submitted",
+            "reward": None,
+            "submitted_at": datetime.now().isoformat(),
+        }
+    )
+
+    return {"success": True, "data": application}
+
+
+# 管理员接口
+
+
+@app.post("/api/admin/arena/evaluations")
+def create_arena_evaluation(
+    request: Request,
+    type: str = Form(...),
+    period: str = Form(...),
+    start_date: str = Form(...),
+    end_date: str = Form(...),
+):
+    """创建评选（管理员）"""
+    verify_admin_token(request)
+
+    reward_type = REWARD_TYPES.get(type)
+    if not reward_type:
+        raise HTTPException(status_code=400, detail="无效的奖励类型")
+
+    evaluation = arena_db.create_evaluation(
+        {
+            "type": type,
+            "name": reward_type["name"],
+            "period": period,
+            "start_date": start_date,
+            "end_date": end_date,
+            "budget": reward_type["budget"],
+            "status": "open",
+            "total_rewarded": 0,
+            "total_applications": 0,
+            "total_approved": 0,
+        }
+    )
+
+    return {"success": True, "data": evaluation}
+
+
+@app.post("/api/admin/arena/applications/{application_id}/approve")
+def approve_arena_application(
+    request: Request,
+    application_id: str,
+    reward: int = Form(...),
+    remarks: str = Form(""),
+):
+    """审批申报（管理员）"""
+    verify_admin_token(request)
+
+    application = arena_db.get_application(application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="申报不存在")
+
+    # 更新申报
+    arena_db.update_application(
+        application_id,
+        {
+            "status": "approved",
+            "reward": reward,
+            "remarks": remarks,
+            "approved_at": datetime.now().isoformat(),
+        },
+    )
+
+    # 更新评选统计
+    evaluation = arena_db.get_evaluation(application["evaluation_id"])
+    if evaluation:
+        arena_db.update_evaluation(
+            application["evaluation_id"],
+            {
+                "total_rewarded": evaluation.get("total_rewarded", 0) + reward,
+                "total_approved": evaluation.get("total_approved", 0) + 1,
+            },
+        )
+
+    return {"success": True, "message": "审批通过"}
+
+
+@app.post("/api/admin/arena/applications/{application_id}/reject")
+def reject_arena_application(
+    request: Request,
+    application_id: str,
+    reason: str = Form(...),
+):
+    """拒绝申报（管理员）"""
+    verify_admin_token(request)
+
+    application = arena_db.get_application(application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="申报不存在")
+
+    arena_db.update_application(
+        application_id,
+        {
+            "status": "rejected",
+            "remarks": reason,
+            "rejected_at": datetime.now().isoformat(),
+        },
+    )
+
+    return {"success": True, "message": "已拒绝"}
+
+
+# ============ 埋点和评分 API ============
+
+from app.metrics_db import metrics_db
+
+
+@app.post("/api/track")
+async def track_event(request: Request):
+    """接收前端埋点数据"""
+    try:
+        data = await request.json()
+        event_type = data.get("event")
+        skill_id = data.get("skill_id")
+        user_id = data.get("user_id")
+        event_data = data.get("data", {})
+
+        # 获取IP
+        ip = request.client.host
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            ip = forwarded.split(",")[0].strip()
+
+        event = metrics_db.track_event(
+            event_type=event_type,
+            skill_id=skill_id,
+            user_id=user_id,
+            data=event_data,
+            ip=ip,
+        )
+
+        return {"success": True, "data": event}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def _get_skill_by_slug(slug: str) -> dict:
+    """根据slug获取Skill"""
+    data = skills_db.read()
+    skills = data.get("skills", [])
+    for skill in skills:
+        if skill.get("slug") == slug:
+            return skill
+    return None
+
+
+@app.get("/api/skills/{slug}/score-detail")
+def get_skill_score_detail(
+    slug: str,
+    award: str = Query(
+        "innovation", description="奖项类型: quality, popularity, innovation"
+    ),
+):
+    """获取Skill评分明细"""
+    skill = _get_skill_by_slug(slug)
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill不存在")
+
+    stats = metrics_db.get_skill_stats(slug)
+
+    if award == "quality":
+        score = metrics_db.calculate_quality_score(slug, skill)
+    elif award == "popularity":
+        score = metrics_db.calculate_popularity_score(slug, skill)
+    else:
+        score = metrics_db.calculate_innovation_score(slug, skill)
+
+    # 详细计算过程
+    readme_length = len(skill.get("readme_content", ""))
+    tag_count = len(skill.get("tags", []))
+    version_count = len(skill.get("versions", []))
+
+    # 创新度标签匹配
+    complex_tags = ["Agent开发", "MCP开发", "自动化开发"]
+    tags = skill.get("tags", [])
+    matched_complex_tags = [
+        tag for tag in tags if any(ct in tag for ct in complex_tags)
+    ]
+
+    # 维护活跃度计算
+    from datetime import datetime
+
+    update_days = (
+        datetime.now()
+        - datetime.fromisoformat(skill.get("updated_at", datetime.now().isoformat()))
+    ).days
+
+    detail = {
+        "skill_name": skill.get("name"),
+        "author": skill.get("author_name"),
+        "department": skill.get("author_department"),
+        "total_score": score["total_score"],
+        "score_level": _get_score_level(score["total_score"]),
+        "dimensions": {
+            "usage": {
+                "name": "使用价值",
+                "weight": "35%",
+                "score": score["usage_score"],
+                "max_score": 35,
+                "details": {
+                    "total_downloads": stats.get("total_downloads", 0),
+                    "download_score": f"{stats.get('total_downloads', 0)} × 2 = {min(stats.get('total_downloads', 0) * 2, 35)}分",
+                    "formula": "min(下载量 × 2, 35)",
+                },
+            },
+            "quality": {
+                "name": "质量水平",
+                "weight": "25%",
+                "score": score["quality_score"],
+                "max_score": 25,
+                "details": {
+                    "readme": {
+                        "length": readme_length,
+                        "score": f"min({readme_length}/100, 10) = {min(readme_length / 100, 10)}分",
+                    },
+                    "tags": {
+                        "count": tag_count,
+                        "score": f"min({tag_count} × 2, 10) = {min(tag_count * 2, 10)}分",
+                        "tags_list": tags,
+                    },
+                    "versions": {
+                        "count": version_count,
+                        "score": f"min({version_count} × 5, 5) = {min(version_count * 5, 5)}分",
+                    },
+                    "formula": "README得分 + 标签得分 + 版本得分",
+                },
+            },
+            "innovation": {
+                "name": "创新程度",
+                "weight": "20%",
+                "score": score["innovation_score"],
+                "max_score": 20,
+                "details": {
+                    "complex_tags": complex_tags,
+                    "matched_tags": matched_complex_tags,
+                    "score": f"{len(matched_complex_tags)} × 5 = {min(len(matched_complex_tags) * 5, 20)}分",
+                    "formula": "min(复杂标签数 × 5, 20)",
+                },
+            },
+            "promotion": {
+                "name": "推广效果",
+                "weight": "15%",
+                "score": score["promotion_score"],
+                "max_score": 15,
+                "details": {
+                    "search_appearances": stats.get("search_appearances", 0),
+                    "favorites": stats.get("total_favorites", 0),
+                    "shares": stats.get("total_shares", 0),
+                    "score": f"{stats.get('search_appearances', 0)}×0.5 + {stats.get('total_favorites', 0)}×2 + {stats.get('total_shares', 0)}×3 = {score['promotion_score']}分",
+                    "formula": "min(搜索×0.5 + 收藏×2 + 分享×3, 15)",
+                },
+            },
+            "maintenance": {
+                "name": "维护活跃度",
+                "weight": "5%",
+                "score": score["maintenance_score"],
+                "max_score": 5,
+                "details": {
+                    "update_days": update_days,
+                    "score": f"max(0, 5 - {update_days}/30) = {score['maintenance_score']}分",
+                    "formula": "max(0, 5 - 更新天数/30)",
+                },
+            },
+        },
+        "raw_stats": stats,
+    }
+
+    return {"success": True, "data": detail}
+
+
+def _get_score_level(total_score: float) -> dict:
+    """获取评分等级"""
+    if total_score >= 90:
+        return {
+            "level": "S",
+            "name": "卓越",
+            "description": "功能强大，广受欢迎，持续维护",
+        }
+    elif total_score >= 75:
+        return {"level": "A", "name": "优秀", "description": "质量较高，有一定使用量"}
+    elif total_score >= 60:
+        return {"level": "B", "name": "良好", "description": "基本合格，需要更多推广"}
+    elif total_score >= 40:
+        return {"level": "C", "name": "一般", "description": "功能简单，使用较少"}
+    else:
+        return {"level": "D", "name": "待改进", "description": "需要完善文档和功能"}
+
+
+@app.get("/api/skills/{slug}/stats")
+def get_skill_stats(slug: str):
+    """获取Skill的详细统计数据"""
+    skill = _get_skill_by_slug(slug)
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill不存在")
+
+    stats = metrics_db.get_skill_stats(slug)
+    score = metrics_db.calculate_skill_score(slug, skill)
+
+    return {
+        "success": True,
+        "data": {
+            **stats,
+            **score,
+            "skill_name": skill.get("name"),
+            "author": skill.get("author_name"),
+        },
+    }
+
+
+@app.post("/api/skills/{slug}/rate")
+async def rate_skill(slug: str, request: Request):
+    """给Skill评分"""
+    skill = _get_skill_by_slug(slug)
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill不存在")
+
+    data = await request.json()
+    rating = data.get("rating")
+    comment = data.get("comment")
+    user_id = data.get("user_id", "anonymous")
+
+    if not rating or not (1 <= rating <= 5):
+        raise HTTPException(status_code=400, detail="评分必须在1-5之间")
+
+    result = metrics_db.add_rating(slug, user_id, rating, comment)
+
+    return {"success": True, "data": result}
+
+
+@app.get("/api/arena/candidates")
+def get_arena_candidates():
+    """获取Skill擂台候选人（实时计算）"""
+    # 获取所有已审核的Skill
+    data = skills_db.read()
+    skills = data.get("skills", [])
+    approved_skills = [s for s in skills if s.get("status") == "approved"]
+
+    candidates = metrics_db.get_arena_candidates(approved_skills)
+
+    return {
+        "success": True,
+        "data": candidates,
+    }
+
+
+@app.get("/api/arena/rankings")
+def get_arena_rankings(
+    type: str = Query("all", description="排名类型: all, basic, popular, innovation"),
+    limit: int = Query(10, description="返回数量"),
+):
+    """获取排行榜"""
+    data = skills_db.read()
+    skills = data.get("skills", [])
+    approved_skills = [s for s in skills if s.get("status") == "approved"]
+
+    if type == "popular":
+        rankings = metrics_db.get_top_skills("total_downloads", limit)
+    elif type == "basic":
+        # 按作者统计
+        author_stats = {}
+        for skill in approved_skills:
+            key = f"{skill.get('author_name', '')}-{skill.get('author_department', '')}"
+            if key not in author_stats:
+                author_stats[key] = {
+                    "author": skill.get("author_name"),
+                    "department": skill.get("author_department"),
+                    "organization": skill.get("author_organization"),
+                    "count": 0,
+                    "skills": [],
+                }
+            author_stats[key]["count"] += 1
+            author_stats[key]["skills"].append(skill.get("name"))
+
+        rankings = sorted(
+            author_stats.values(),
+            key=lambda x: x["count"],
+            reverse=True,
+        )[:limit]
+    elif type == "innovation":
+        scored_skills = []
+        for skill in approved_skills:
+            score = metrics_db.calculate_skill_score(skill.get("slug"), skill)
+            scored_skills.append(
+                {
+                    "skill_name": skill.get("name"),
+                    "author": skill.get("author_name"),
+                    "department": skill.get("author_department"),
+                    "organization": skill.get("author_organization"),
+                    **score,
+                }
+            )
+
+        rankings = sorted(
+            scored_skills,
+            key=lambda x: x["total_score"],
+            reverse=True,
+        )[:limit]
+    else:
+        rankings = metrics_db.get_top_skills("total_downloads", limit)
+
+    return {
+        "success": True,
+        "data": rankings,
+    }
 
 
 if __name__ == "__main__":

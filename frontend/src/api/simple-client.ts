@@ -413,3 +413,83 @@ export async function healthCheck(): Promise<{ status: string; version: string }
   if (!response.ok) throw new Error('Health check failed');
   return response.json();
 }
+
+// ========== 埋点追踪 ==========
+
+export async function trackEvent(
+  event: string,
+  skillId?: string,
+  data?: Record<string, any>
+): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/track`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      event,
+      skill_id: skillId,
+      data,
+      user_id: getUserId(),
+    }),
+  });
+  if (!response.ok) throw new Error('Failed to track event');
+  return response.json();
+}
+
+export async function getSkillStats(slug: string): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/skills/${slug}/stats`);
+  if (!response.ok) throw new Error('Failed to get skill stats');
+  return response.json();
+}
+
+export async function getSkillScoreDetail(slug: string): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/skills/${slug}/score-detail`);
+  if (!response.ok) throw new Error('Failed to get skill score detail');
+  return response.json();
+}
+
+export async function rateSkill(
+  slug: string,
+  rating: number,
+  comment?: string
+): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/skills/${slug}/rate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rating,
+      comment,
+      user_id: getUserId(),
+    }),
+  });
+  if (!response.ok) throw new Error('Failed to rate skill');
+  return response.json();
+}
+
+export async function getArenaCandidates(): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/arena/candidates`);
+  if (!response.ok) throw new Error('Failed to get arena candidates');
+  return response.json();
+}
+
+export async function getArenaRankings(
+  type: string = 'all',
+  limit: number = 10
+): Promise<ApiResponse<any>> {
+  const response = await fetch(
+    `${API_BASE}/arena/rankings?type=${type}&limit=${limit}`
+  );
+  if (!response.ok) throw new Error('Failed to get arena rankings');
+  return response.json();
+}
+
+// 获取用户ID（基于IP的简单标识）
+function getUserId(): string {
+  // 尝试从localStorage获取
+  let userId = localStorage.getItem('skillhub_user_id');
+  if (!userId) {
+    // 生成随机ID
+    userId = 'user_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('skillhub_user_id', userId);
+  }
+  return userId;
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { getSkills, searchSkills, getSkill, publishSkill, updateSkill, deleteSkill, recordView, getStats, getKpi, getTrend, getRealtimeEvents, getSearchAnalysis, adminLogin, getPending, approveSkill, getAuditLogs, Skill, SkillDetail, StatsData, KpiData, TrendData, RealtimeEvent, SearchAnalysis, AuditLog } from './api/simple-client'
+import { getSkills, searchSkills, getSkill, publishSkill, updateSkill, deleteSkill, recordView, getStats, getKpi, getTrend, getRealtimeEvents, getSearchAnalysis, adminLogin, getPending, approveSkill, getAuditLogs, trackEvent, Skill, SkillDetail, StatsData, KpiData, TrendData, RealtimeEvent, SearchAnalysis, AuditLog } from './api/simple-client'
 import { WebhookLogView } from './components/webhook-log-view'
+import { ArenaPage } from './components/arena-page'
 import { UploadZone } from './features/publish/upload-zone'
 import { SearchBar } from './features/search/search-bar'
 import { Button } from './shared/ui/button'
@@ -1094,7 +1095,7 @@ function SimpleSkillCard({ skill, onClick, onDelete }: { skill: Skill; onClick: 
 
 // Main App
 export function SimpleApp() {
-  const [currentView, setCurrentView] = useState<'start' | 'home' | 'publish' | 'detail' | 'stats' | 'admin' | 'webhook'>('start')
+  const [currentView, setCurrentView] = useState<'start' | 'home' | 'publish' | 'detail' | 'stats' | 'admin' | 'webhook' | 'arena'>('start')
   const [skills, setSkills] = useState<Skill[]>([])
   const [selectedSkill, setSelectedSkill] = useState<SkillDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -1155,6 +1156,10 @@ export function SimpleApp() {
     if (filters) setSearchFilters(filters)
     const effectiveFilters = filters || searchFilters
     const q = query.trim() || searchQuery
+    // 埋点：搜索
+    if (q) {
+      trackEvent('skill.search', undefined, { query: q, filters: effectiveFilters }).catch(() => {})
+    }
     // 无关键词且无筛选条件时，回到列表模式
     if (!q && !effectiveFilters.author && !effectiveFilters.department && !effectiveFilters.tag) { 
       loadSkills(0); return 
@@ -1223,6 +1228,8 @@ export function SimpleApp() {
   async function handleSkillClick(slug: string) {
     try {
       await recordView(slug)
+      // 埋点：浏览Skill
+      trackEvent('skill.view', slug, { source: 'list' }).catch(() => {})
       const result = await getSkill(slug)
       setSelectedSkill(result.data)
       setCurrentView('detail')
@@ -1289,13 +1296,13 @@ export function SimpleApp() {
               onError={(e) => { e.currentTarget.style.display = 'none' }} 
             />
             <nav className="hidden sm:flex bg-gray-100/80 p-1 rounded-xl">
-              {[{ key: 'start', label: '开始' }, { key: 'home', label: '浏览' }, { key: 'publish', label: '发布' }, { key: 'stats', label: '展示' }, { key: 'admin', label: '上线与管理' }, { key: 'webhook', label: 'Webhook日志' }].map((item) => (
+              {[{ key: 'start', label: '开始' }, { key: 'home', label: '浏览' }, { key: 'publish', label: '发布' }, { key: 'arena', label: 'Skill擂台' }, { key: 'stats', label: '展示' }, { key: 'admin', label: '上线与管理' }, { key: 'webhook', label: 'Webhook日志' }].map((item) => (
                 <button key={item.key} onClick={() => item.key === 'admin' ? handleAdminClick() : item.key === 'webhook' ? handleWebhookClick() : setCurrentView(item.key as any)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${currentView === item.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{item.label}</button>
               ))}
             </nav>
             <div className="sm:hidden">
               <select value={currentView} onChange={(e) => { const v = e.target.value; v === 'admin' ? handleAdminClick() : v === 'webhook' ? handleWebhookClick() : setCurrentView(v as any) }} className="bg-gray-100 border-0 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-pink-500">
-                <option value="start">开始</option><option value="home">浏览</option><option value="publish">发布</option><option value="stats">展示</option><option value="admin">上线与管理</option><option value="webhook">Webhook日志</option>
+                <option value="start">开始</option><option value="home">浏览</option><option value="publish">发布</option><option value="arena">Skill擂台</option><option value="stats">展示</option><option value="admin">上线与管理</option><option value="webhook">Webhook日志</option>
               </select>
             </div>
           </div>
@@ -1386,6 +1393,11 @@ export function SimpleApp() {
         {currentView === 'webhook' && adminToken && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <WebhookLogView token={adminToken} />
+          </div>
+        )}
+        {currentView === 'arena' && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <ArenaPage />
           </div>
         )}
       </main>
@@ -1514,7 +1526,14 @@ function DetailView({ skill, on返回, on更新, on编辑 }: { skill: SkillDetai
                 编辑
               </button>
               {skill.status === 'approved' ? (
-                <a href={`/api/skills/${skill.slug}/download`} download className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-xl shadow-lg shadow-blue-200 hover:shadow-xl hover:shadow-blue-300 transition-all hover:-translate-y-0.5">
+                <a 
+                  href={`/api/skills/${skill.slug}/download`} 
+                  download 
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-xl shadow-lg shadow-blue-200 hover:shadow-xl hover:shadow-blue-300 transition-all hover:-translate-y-0.5"
+                  onClick={() => {
+                    trackEvent('skill.download', skill.slug, { version: skill.latest_version }).catch(() => {})
+                  }}
+                >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                   下载
                 </a>
