@@ -29,9 +29,12 @@ export interface NavigationConfig {
 export const navigationConfig: NavigationConfig = {
   links: [
     { label: "开始", href: "#hero" },
-    { label: "能力矩阵", href: "#curriculum" },
-    { label: "复利效应", href: "#cinematic" },
-    { label: "智能体", href: "#alumni" },
+    { label: "浏览", href: "#home" },
+    { label: "发布", href: "#publish" },
+    { label: "Skill擂台", href: "#arena" },
+    { label: "展示", href: "#stats" },
+    { label: "上线与管理", href: "#admin" },
+    { label: "Webhook日志", href: "#webhook" },
   ],
   ctaText: "立即进入",
 };

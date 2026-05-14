@@ -1243,6 +1243,18 @@ export function SimpleApp() {
     if (currentView === 'home') loadSkills(0)
   }, [activeTags, activeSubTags])
 
+  // 监听导航事件
+  useEffect(() => {
+    const handleNavigate = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.view) {
+        setCurrentView(detail.view);
+      }
+    };
+    window.addEventListener('navigateToView', handleNavigate);
+    return () => window.removeEventListener('navigateToView', handleNavigate);
+  }, [])
+
   async function handleSkillClick(slug: string) {
     try {
       await recordView(slug)

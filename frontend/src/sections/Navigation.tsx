@@ -12,12 +12,9 @@ export default function Navigation() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    e.preventDefault();
-    const el = document.querySelector(href);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
+  const handleNavClick = (view: string) => {
+    // 触发自定义事件，通知 App 组件切换视图
+    window.dispatchEvent(new CustomEvent('navigateToView', { detail: { view } }));
   };
 
   if (!siteConfig.brandName && navigationConfig.links.length === 0) {
@@ -36,23 +33,21 @@ export default function Navigation() {
         borderBottom: scrolled ? '1px solid #D6E4FF' : '1px solid transparent',
       }}
     >
-      <a
-        href="#hero"
-        onClick={(e) => handleClick(e, '#hero')}
+      <button
+        onClick={() => handleNavClick('start')}
         className="no-underline flex items-center"
-        style={{ gap: 10 }}
+        style={{ gap: 10, background: 'none', border: 'none', cursor: 'pointer' }}
       >
         <div className="text-xl font-bold" style={{ color: '#0033CC' }}>
           {siteConfig.brandName}
         </div>
-      </a>
+      </button>
 
       <div className="hidden md:flex items-center" style={{ gap: 32 }}>
         {navigationConfig.links.map((link) => (
-          <a
+          <button
             key={link.label}
-            href={link.href}
-            onClick={(e) => handleClick(e, link.href)}
+            onClick={() => handleNavClick(link.href.replace('#', ''))}
             className="nav-link"
             style={{
               color: '#0F1A4D',
@@ -60,17 +55,20 @@ export default function Navigation() {
               fontWeight: 400,
               fontSize: 14,
               letterSpacing: '0.3px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px 0',
             }}
           >
             {link.label}
-          </a>
+          </button>
         ))}
       </div>
 
       {navigationConfig.ctaText && (
-        <a
-          href="#footer"
-          onClick={(e) => handleClick(e, '#footer')}
+        <button
+          onClick={() => handleNavClick('home')}
           className="nav-cta hidden md:inline-flex"
           style={{
             padding: '8px 20px',
@@ -82,6 +80,8 @@ export default function Navigation() {
             fontSize: 13,
             textDecoration: 'none',
             transition: 'all 0.3s ease',
+            border: 'none',
+            cursor: 'pointer',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#2B5CFF';
@@ -93,7 +93,7 @@ export default function Navigation() {
           }}
         >
           {navigationConfig.ctaText}
-        </a>
+        </button>
       )}
     </nav>
   );
