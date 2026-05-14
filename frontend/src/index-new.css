@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'GeistMono';
+  src: url('/node_modules/geist/dist/fonts/geist-mono/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --background: 220 100% 99%;
+    --foreground: 228 65% 18%;
+    --card: 0 0% 100%;
+    --card-foreground: 228 65% 18%;
+    --popover: 220 100% 99%;
+    --popover-foreground: 228 65% 18%;
+    --primary: 225 100% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 30% 93%;
+    --secondary-foreground: 228 65% 18%;
+    --muted: 220 30% 93%;
+    --muted-foreground: 220 20% 63%;
+    --accent: 186 100% 50%;
+    --accent-foreground: 228 65% 18%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 30% 85%;
+    --input: 220 30% 93%;
+    --ring: 225 100% 40%;
+    --radius: 0px;
+  }
+
+  body {
+    @apply bg-[#F8FAFF] text-[#0F1A4D];
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+  }
+}
+
+@layer components {
+  @keyframes blur-text {
+    0% {
+      filter: blur(0px);
+      opacity: 1;
+    }
+    100% {
+      filter: blur(4px);
+      opacity: 0.4;
+    }
+  }
+
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: #F8FAFF;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.8s ease-in-out;
+  }
+
+  .loading-overlay.fade-out {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .loading-text {
+    display: flex;
+    gap: 12px;
+  }
+
+  .loading-text span {
+    display: inline-block;
+    color: #ffffff;
+    font-family: 'Inter', sans-serif;
+    font-weight: 200;
+    font-size: 18px;
+    letter-spacing: 8px;
+    filter: blur(0px);
+    animation: blur-text 1.5s infinite linear alternate;
+  }
+
+  .loading-text span:nth-child(1) { animation-delay: 0.0s; }
+  .loading-text span:nth-child(2) { animation-delay: 0.2s; }
+  .loading-text span:nth-child(3) { animation-delay: 0.4s; }
+  .loading-text span:nth-child(4) { animation-delay: 0.6s; }
+  .loading-text span:nth-child(5) { animation-delay: 0.8s; }
+  .loading-text span:nth-child(6) { animation-delay: 1.0s; }
+  .loading-text span:nth-child(7) { animation-delay: 1.2s; }
+
+  .nav-link {
+    position: relative;
+    color: #0F1A4D;
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    letter-spacing: 0.3px;
+    text-decoration: none;
+    padding-bottom: 2px;
+    transition: color 0.3s ease;
+  }
+
+  .nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 1.5px;
+    background: #0033CC;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .nav-link:hover {
+    color: #0033CC;
+  }
+
+  .nav-link:hover::after {
+    transform: scaleX(1);
+  }
+
+  /* Shimmer text sweep effect */
+  @keyframes shimmer-sweep {
+    0% {
+      left: -100%;
+    }
+    100% {
+      left: 150%;
+    }
+  }
+
+  .shimmer-active {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer-active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(0, 240, 255, 0.4),
+      rgba(255, 255, 255, 0.6),
+      rgba(0, 240, 255, 0.4),
+      transparent
+    );
+    animation: shimmer-sweep 1.5s ease-in-out forwards;
+    pointer-events: none;
+  }
+}
