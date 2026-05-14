@@ -9,6 +9,17 @@ export default function CinematicVision() {
   const descRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
+    const video = videoRef.current;
+    if (video) {
+      // 确保视频自动播放
+      video.play().catch(err => {
+        console.log('Auto-play prevented:', err);
+        // 如果自动播放被阻止，尝试静音后播放
+        video.muted = true;
+        video.play().catch(e => console.log('Still cannot play:', e));
+      });
+    }
+
     const text = titleRef.current;
     if (!text) return;
 
@@ -110,10 +121,23 @@ export default function CinematicVision() {
               playsInline
               preload="auto"
               className="w-full h-full object-cover"
-              style={{ display: 'block' }}
+              style={{ display: 'block', minHeight: '200px' }}
+              onLoadedData={() => console.log('Video loaded successfully')}
               onError={(e) => {
                 console.error('Video failed to load:', architectureConfig.videoPath);
-                (e.target as HTMLVideoElement).style.display = 'none';
+                const videoEl = e.target as HTMLVideoElement;
+                videoEl.style.display = 'none';
+                // 显示备用内容
+                const container = videoEl.parentElement;
+                if (container) {
+                  container.style.background = 'linear-gradient(135deg, #0033CC 0%, #2B5CFF 100%)';
+                  container.style.display = 'flex';
+                  container.style.alignItems = 'center';
+                  container.style.justifyContent = 'center';
+                  const fallback = document.createElement('div');
+                  fallback.innerHTML = '<div style="text-align:center;color:white;"><div style="font-size:48px;margin-bottom:16px;">🎬</div><div style="font-size:18px;font-weight:600;">智能体复利效应</div></div>';
+                  container.appendChild(fallback);
+                }
               }}
             />
           </div>
