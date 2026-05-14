@@ -95,9 +95,10 @@ export default function CinematicVision() {
               width: '100%',
               maxWidth: 900,
               margin: '0 auto 56px',
-              aspectRatio: '21/9',
+              aspectRatio: '16/9',
               borderRadius: 12,
               boxShadow: '0 20px 60px rgba(0, 51, 204, 0.2)',
+              background: '#0a1628',
             }}
           >
             <video
@@ -107,8 +108,13 @@ export default function CinematicVision() {
               muted
               loop
               playsInline
+              preload="auto"
               className="w-full h-full object-cover"
               style={{ display: 'block' }}
+              onError={(e) => {
+                console.error('Video failed to load:', architectureConfig.videoPath);
+                (e.target as HTMLVideoElement).style.display = 'none';
+              }}
             />
           </div>
         )}
