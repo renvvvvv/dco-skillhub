@@ -129,6 +129,68 @@ class WeeklyPicksDatabase:
             "history": db.get("history", []),
         }
 
+    def update_weekly_picks(
+        self,
+        week_id: str,
+        picks: List[dict],
+        admin_id: str = "admin",
+        admin_name: str = "管理员",
+    ) -> dict:
+        """
+        更新指定周的精选（支持历史记录编辑）
+
+        week_id: 周记录ID
+        picks: [
+            {"skill_slug": "xxx", "reason": "评选理由"},
+            ...
+        ]
+        """
+        if len(picks) != 3:
+            raise ValueError("必须选择3个Skill")
+
+        db = self._read()
+
+        # 先尝试更新当前周
+        current = db.get("current_week")
+        if current and current.get("id") == week_id:
+            current["picks"] = picks
+            current["selected_by"] = admin_id
+            current["selected_by_name"] = admin_name
+            current["updated_at"] = datetime.now().isoformat()
+            db["current_week"] = current
+            self._write(db)
+            return current
+
+        # 再尝试更新历史记录
+        history = db.get("history", [])
+        for i, week in enumerate(history):
+            if week.get("id") == week_id:
+                history[i]["picks"] = picks
+                history[i]["selected_by"] = admin_id
+                history[i]["selected_by_name"] = admin_name
+                history[i]["updated_at"] = datetime.now().isoformat()
+                db["history"] = history
+                self._write(db)
+                return history[i]
+
+        raise ValueError(f"未找到周记录: {week_id}")
+
+    def get_week_by_id(self, week_id: str) -> Optional[dict]:
+        """根据ID获取指定周的精选记录"""
+        db = self._read()
+
+        # 先查当前周
+        current = db.get("current_week")
+        if current and current.get("id") == week_id:
+            return current
+
+        # 再查历史
+        for week in db.get("history", []):
+            if week.get("id") == week_id:
+                return week
+
+        return None
+
 
 # 全局实例
 weekly_picks_db = WeeklyPicksDatabase()

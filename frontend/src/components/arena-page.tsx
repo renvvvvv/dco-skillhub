@@ -88,7 +88,7 @@ const RULES = [
 
 
 export function ArenaPage() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'quality' | 'popularity' | 'innovation'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'weekly-picks' | 'quality' | 'popularity' | 'innovation'>('overview')
   const [candidates, setCandidates] = useState<Record<string, any[]>>({})
   const [, setRankings] = useState<Record<string, any[]>>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -153,6 +153,7 @@ export function ArenaPage() {
         <div className="flex border-b overflow-x-auto">
           {[
             { key: 'overview', label: '方案总览', icon: '📊' },
+            { key: 'weekly-picks', label: '⭐ 小智优选', icon: '' },
             { key: 'quality', label: '应用质量奖', icon: '✨' },
             { key: 'popularity', label: '用户喜爱奖', icon: '❤️' },
             { key: 'innovation', label: '卓越创新奖', icon: '🏆' }
@@ -173,6 +174,7 @@ export function ArenaPage() {
 
         <div className="p-6">
           {activeTab === 'overview' && <OverviewTab candidates={candidates} />}
+          {activeTab === 'weekly-picks' && <WeeklyPicksTab />}
           {activeTab === 'quality' && <AwardDetailTab award={AWARD_CONFIG.quality} candidates={candidates.quality || []} awardType="quality" onViewDetail={handleViewDetail} />}
           {activeTab === 'popularity' && <AwardDetailTab award={AWARD_CONFIG.popularity} candidates={candidates.popularity || []} awardType="popularity" onViewDetail={handleViewDetail} />}
           {activeTab === 'innovation' && <InnovationAwardTab award={AWARD_CONFIG.innovation} candidates={candidates.innovation || []} onViewDetail={handleViewDetail} />}
@@ -305,8 +307,26 @@ function OverviewTab({ candidates }: { candidates: Record<string, any[]> }) {
   )
 }
 
+// 小智优选标签页
+function WeeklyPicksTab() {
+  return (
+    <div className="space-y-6">
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-200">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-3xl">⭐</span>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">小智优选</h2>
+            <p className="text-gray-600">每周精选3个优质Skill，由管理员人工挑选</p>
+          </div>
+        </div>
+      </div>
+      <WeeklyPicks />
+    </div>
+  )
+}
+
 // 奖项详情页（通用）
-function AwardDetailTab({ award, candidates, awardType: _awardType, onViewDetail: _onViewDetail2 }: { award: any; candidates: any[]; awardType: 'quality' | 'popularity'; onViewDetail?: (slug: string, awardType: 'quality' | 'popularity' | 'innovation') => void }) {
+function AwardDetailTab({ award, candidates, awardType, onViewDetail: _onViewDetail2 }: { award: any; candidates: any[]; awardType: 'quality' | 'popularity'; onViewDetail?: (slug: string, awardType: 'quality' | 'popularity' | 'innovation') => void }) {
   return (
     <div className="space-y-8">
       {/* 奖项介绍 */}
@@ -360,83 +380,86 @@ function AwardDetailTab({ award, candidates, awardType: _awardType, onViewDetail
         </div>
       </div>
 
-      {/* 奖励详情 */}
+      {/* 指标计算公式 */}
       <div>
-        <h3 className="text-xl font-bold text-gray-900 mb-4">💰 奖励详情</h3>
-        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl p-6 border border-amber-200">
-          {award.rewards ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {award.rewards.map((reward: any) => (
-                <div key={reward.level} className="bg-white rounded-lg p-4 border text-center">
-                  <span className="inline-block px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-bold mb-2">
-                    {reward.label}
-                  </span>
-                  <p className="text-2xl font-bold text-green-600">¥{reward.reward}</p>
-                  <p className="text-xs text-gray-500">最低{reward.minScore}分</p>
-                </div>
-              ))}
-            </div>
-          ) : award.ranks ? (
-            <div className="space-y-3">
-              {award.ranks.map((rank: any) => (
-                <div key={rank.rank} className="flex items-center justify-between bg-white rounded-lg p-4 border">
-                  <div className="flex items-center gap-3">
-                    <span className="w-10 h-10 bg-amber-400 rounded-full flex items-center justify-center text-white font-bold">
-                      {rank.rank}
-                    </span>
-                    <div>
-                      <p className="font-bold text-gray-900">{rank.label}</p>
-                      <p className="text-sm text-gray-500">共{rank.count}个名额</p>
-                    </div>
-                  </div>
-                  <span className="text-2xl font-bold text-green-600">¥{rank.reward}</span>
-                </div>
-              ))}
-            </div>
-          ) : null}
+        <h3 className="text-xl font-bold text-gray-900 mb-4">🔢 指标计算公式</h3>
+        <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+          <FormulaDisplay awardId={award.id} />
         </div>
       </div>
 
-      {/* 候选人列表 */}
+      {/* 动态候选人TOP3 */}
       <div>
-        <h3 className="text-xl font-bold text-gray-900 mb-4">🏅 当前候选人</h3>
+        <h3 className="text-xl font-bold text-gray-900 mb-4">🏅 动态候选人TOP3</h3>
         <div className="space-y-3">
           {candidates.length > 0 ? (
-            candidates.map((candidate, index) => (
-              <div key={index} className="bg-white rounded-xl border p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                      candidate.rank === 1 ? 'bg-amber-400 text-white' :
-                      candidate.rank === 2 ? 'bg-gray-300 text-white' :
-                      candidate.rank === 3 ? 'bg-orange-400 text-white' :
-                      'bg-gray-100 text-gray-600'
-                    }`}>
-                      {candidate.rank}
-                    </span>
-                    <div>
-                      <p className="font-bold text-gray-900">{candidate.skillName}</p>
-                      <p className="text-sm text-gray-500">{candidate.author} · {candidate.department}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-green-600">{candidate.metric}</p>
-                    <p className="text-xs text-gray-500">{candidate.score > 0 ? `${candidate.score}分` : ''}</p>
-                  </div>
+            candidates.map(candidate => (
+              <div key={candidate.rank} 
+                className={`flex items-center gap-4 p-4 rounded-xl border transition-all hover:shadow-md ${
+                  candidate.rank <= 3 ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200' : 'bg-white'
+                }`}
+              >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold ${
+                  candidate.rank === 1 ? 'bg-amber-400 text-white' :
+                  candidate.rank === 2 ? 'bg-gray-300 text-white' :
+                  candidate.rank === 3 ? 'bg-orange-400 text-white' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {candidate.rank <= 3 ? ['🥇', '🥈', '🥉'][candidate.rank - 1] : candidate.rank}
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900">{candidate.skill_name || candidate.skillName}</p>
+                  <p className="text-sm text-gray-500">
+                    {candidate.author} · {candidate.department} · {candidate.organization}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-green-600">{candidate.metric || `${candidate.total_score || candidate.popularity_index}分`}</p>
+                  <p className="text-xs text-gray-400">
+                    {candidate.trend === 'up' ? '📈 上升' : candidate.trend === 'down' ? '📉 下降' : '➡️ 稳定'}
+                  </p>
+                  {candidate.skill_slug && _onViewDetail2 && (
+                    <button
+                      onClick={() => _onViewDetail2(candidate.skill_slug, awardType)}
+                      className="mt-1 text-xs text-blue-500 hover:text-blue-700 underline"
+                    >
+                      查看分数计算详情
+                    </button>
+                  )}
                 </div>
               </div>
             ))
           ) : (
-            <p className="text-center text-gray-400 py-8">暂无候选人数据</p>
+            <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed">
+              <p className="text-gray-400">暂无候选人数据</p>
+            </div>
           )}
         </div>
       </div>
+
+      {/* 奖励明细 */}
+      {award.ranks && (
+        <div>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">💰 奖励明细</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {award.ranks.map(rank => (
+              <div key={rank.rank} className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl p-4 border border-yellow-200">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-amber-700">{rank.label}</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-2">¥{rank.reward}</p>
+                  <p className="text-sm text-gray-500 mt-1">共{rank.count}名</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-// 卓越创新奖详情页
-function InnovationAwardTab({ award, candidates, onViewDetail: _onViewDetail }: { award: any; candidates: any[]; onViewDetail?: (slug: string, awardType: 'quality' | 'popularity' | 'innovation') => void }) {
+// 卓越创新奖特殊页面
+function InnovationAwardTab({ award, candidates, onViewDetail: _onViewDetail }: { award: typeof AWARD_CONFIG.innovation; candidates: any[]; onViewDetail?: (slug: string, awardType: 'quality' | 'popularity' | 'innovation') => void }) {
   return (
     <div className="space-y-8">
       {/* 奖项介绍 */}
@@ -473,73 +496,181 @@ function InnovationAwardTab({ award, candidates, onViewDetail: _onViewDetail }: 
       <div>
         <h3 className="text-xl font-bold text-gray-900 mb-4">📊 评分维度</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Object.entries(award.scoringCriteria).map(([key, criteria]: [string, any]) => (
-            <div key={key} className="bg-white rounded-xl p-4 border">
-              <p className="text-sm text-gray-500 mb-1">{criteria.name}</p>
-              <p className="text-3xl font-bold text-blue-600">{criteria.weight}%</p>
-              <p className="text-xs text-gray-400">满分{criteria.maxScore}分</p>
+          {award.scoringCriteria && Object.entries(award.scoringCriteria).map(([key, criteria]) => (
+            <div key={key} className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+              <p className="text-sm text-gray-600">{criteria.name}</p>
+              <p className="text-2xl font-bold text-blue-600">{criteria.weight}%</p>
+              <p className="text-xs text-gray-500 mt-1">满分{criteria.maxScore}分</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* 奖励详情 */}
+      {/* 评选标准 */}
       <div>
-        <h3 className="text-xl font-bold text-gray-900 mb-4">💰 奖励详情</h3>
-        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl p-6 border border-amber-200">
-          <div className="space-y-3">
-            {award.ranks.map((rank: any) => (
-              <div key={rank.rank} className="flex items-center justify-between bg-white rounded-lg p-4 border">
-                <div className="flex items-center gap-3">
-                  <span className="w-10 h-10 bg-amber-400 rounded-full flex items-center justify-center text-white font-bold">
-                    {rank.rank}
-                  </span>
-                  <div>
-                    <p className="font-bold text-gray-900">{rank.label}</p>
-                    <p className="text-sm text-gray-500">共{rank.count}个名额</p>
-                  </div>
-                </div>
-                <span className="text-2xl font-bold text-green-600">¥{rank.reward}</span>
+        <h3 className="text-xl font-bold text-gray-900 mb-4">📋 评选标准</h3>
+        <div className="bg-gray-50 rounded-xl p-6 border">
+          <p className="text-gray-700">{award.criteria}</p>
+        </div>
+      </div>
+
+      {/* 指标计算公式 */}
+      <div>
+        <h3 className="text-xl font-bold text-gray-900 mb-4">🔢 综合评分公式</h3>
+        <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+          <div className="space-y-4">
+            <div className="bg-white rounded-lg p-4 border">
+              <p className="font-mono text-lg text-center">
+                总分 = 提效显著性 × 40% + 推广应用性 × 30% + 应用便捷性 × 15% + 可扩展性 × 15%
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="bg-white rounded-lg p-3 border">
+                <p className="font-semibold text-gray-900">提效显著性（40分）</p>
+                <p className="text-gray-600 mt-1">评估Skill对工作效率的提升程度</p>
               </div>
-            ))}
+              <div className="bg-white rounded-lg p-3 border">
+                <p className="font-semibold text-gray-900">推广应用性（30分）</p>
+                <p className="text-gray-600 mt-1">评估Skill在不同场景的适用程度</p>
+              </div>
+              <div className="bg-white rounded-lg p-3 border">
+                <p className="font-semibold text-gray-900">应用便捷性（15分）</p>
+                <p className="text-gray-600 mt-1">评估Skill的使用便捷程度</p>
+              </div>
+              <div className="bg-white rounded-lg p-3 border">
+                <p className="font-semibold text-gray-900">可扩展性（15分）</p>
+                <p className="text-gray-600 mt-1">评估Skill的功能扩展潜力</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 候选人列表 */}
+      {/* 动态候选人TOP3 */}
       <div>
-        <h3 className="text-xl font-bold text-gray-900 mb-4">🏅 当前候选人</h3>
+        <h3 className="text-xl font-bold text-gray-900 mb-4">🏅 动态候选人TOP3</h3>
         <div className="space-y-3">
           {candidates.length > 0 ? (
-            candidates.map((candidate, index) => (
-              <div key={index} className="bg-white rounded-xl border p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                      candidate.rank === 1 ? 'bg-amber-400 text-white' :
-                      candidate.rank === 2 ? 'bg-gray-300 text-white' :
-                      candidate.rank === 3 ? 'bg-orange-400 text-white' :
-                      'bg-gray-100 text-gray-600'
-                    }`}>
-                      {candidate.rank}
-                    </span>
-                    <div>
-                      <p className="font-bold text-gray-900">{candidate.skillName}</p>
-                      <p className="text-sm text-gray-500">{candidate.author} · {candidate.department}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-green-600">{candidate.metric}</p>
-                    <p className="text-xs text-gray-500">{candidate.score > 0 ? `${candidate.score}分` : ''}</p>
-                  </div>
+            candidates.map(candidate => (
+              <div key={candidate.rank} 
+                className={`flex items-center gap-4 p-4 rounded-xl border transition-all hover:shadow-md ${
+                  candidate.rank <= 3 ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200' : 'bg-white'
+                }`}
+              >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold ${
+                  candidate.rank === 1 ? 'bg-amber-400 text-white' :
+                  candidate.rank === 2 ? 'bg-gray-300 text-white' :
+                  candidate.rank === 3 ? 'bg-orange-400 text-white' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {candidate.rank <= 3 ? ['🥇', '🥈', '🥉'][candidate.rank - 1] : candidate.rank}
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900">{candidate.skill_name || candidate.skillName}</p>
+                  <p className="text-sm text-gray-500">
+                    {candidate.author} · {candidate.department} · {candidate.organization}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-green-600">{candidate.metric || `${candidate.total_score}分`}</p>
+                  <p className="text-xs text-gray-400">
+                    {candidate.trend === 'up' ? '📈 上升' : candidate.trend === 'down' ? '📉 下降' : '➡️ 稳定'}
+                  </p>
+                  {candidate.skill_slug && _onViewDetail && (
+                    <button
+                      onClick={() => _onViewDetail(candidate.skill_slug, 'innovation')}
+                      className="mt-1 text-xs text-blue-500 hover:text-blue-700 underline"
+                    >
+                      查看分数计算详情
+                    </button>
+                  )}
                 </div>
               </div>
             ))
           ) : (
-            <p className="text-center text-gray-400 py-8">暂无候选人数据</p>
+            <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed">
+              <p className="text-gray-400">暂无候选人数据</p>
+            </div>
           )}
         </div>
       </div>
+
+      {/* 奖励明细 */}
+      {award.ranks && (
+        <div>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">💰 奖励明细</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {award.ranks.map(rank => (
+              <div key={rank.rank} className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl p-4 border border-yellow-200">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-amber-700">{rank.label}</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-2">¥{rank.reward}</p>
+                  <p className="text-sm text-gray-500 mt-1">共{rank.count}名</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+// 公式展示组件
+function FormulaDisplay({ awardId }: { awardId: string }) {
+  if (awardId === 'quality') {
+    return (
+      <div className="space-y-4">
+        <div className="bg-white rounded-lg p-4 border">
+          <p className="font-mono text-lg text-center">
+            总分 = 质量水平×40% + 使用价值×30% + 创新程度×20% + 维护活跃度×10%
+          </p>
+        </div>
+        <div className="text-sm text-gray-600 space-y-2">
+          <p>• 质量水平(40分)：README完整度(15) + 标签丰富度(10) + 版本迭代(10) + 代码规范(5)</p>
+          <p>• 使用价值(30分)：min(下载量×1.5, 30)</p>
+          <p>• 创新程度(20分)：min(复杂标签数×5, 20)</p>
+          <p>• 维护活跃度(10分)：max(0, 10 - 更新天数/15)</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (awardId === 'popularity') {
+    return (
+      <div className="space-y-4">
+        <div className="bg-white rounded-lg p-4 border">
+          <p className="font-mono text-lg text-center">
+            人气指数 = 使用深度×40% + 互动热度×35% + 传播广度×25%
+          </p>
+        </div>
+        <div className="text-sm text-gray-600 space-y-2">
+          <p>• 使用深度(400分)：下载×2 + 使用×5 + 时长×0.5</p>
+          <p>• 互动热度(350分)：收藏×10 + 评分×20 + 评论×5</p>
+          <p>• 传播广度(250分)：分享×15 + 搜索点击×3 + 推荐曝光×0.1</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (awardId === 'innovation') {
+    return (
+      <div className="space-y-4">
+        <div className="bg-white rounded-lg p-4 border">
+          <p className="font-mono text-lg text-center">
+            总分 = 使用价值×35% + 质量水平×25% + 创新程度×20% + 推广效果×15% + 维护活跃度×5%
+          </p>
+        </div>
+        <div className="text-sm text-gray-600 space-y-2">
+          <p>• 使用价值(35分)：min(下载量×2, 35)</p>
+          <p>• 质量水平(25分)：README(10) + 标签(10) + 版本(5)</p>
+          <p>• 创新程度(20分)：min(复杂标签数×5, 20)</p>
+          <p>• 推广效果(15分)：搜索×0.5 + 收藏×2 + 分享×3</p>
+          <p>• 维护活跃度(5分)：max(0, 5 - 更新天数/30)</p>
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }

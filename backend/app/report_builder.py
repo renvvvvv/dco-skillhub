@@ -126,8 +126,21 @@ class DailyReportBuilder:
         ]
         skill_stats.sort(key=lambda x: x["downloads"], reverse=True)
 
+        # 获取技能总量、总访问量、总下载量、总发布量
+        all_skills = skills_db.read().get("skills", [])
+        total_skills = len(all_skills)
+        total_views = sum(views_map.get(s["slug"], 0) for s in all_skills)
+        total_downloads = sum(s.get("download_count", 0) or 0 for s in all_skills)
+        total_publishes = len([s for s in all_skills if s.get("status") == "approved"])
+
         return {
             "date": date,
+            "summary": {
+                "total_skills": total_skills,
+                "total_views": total_views,
+                "total_downloads": total_downloads,
+                "total_publishes": total_publishes,
+            },
             "yesterday": yesterday_data,
             "this_week": week_data,
             "week_over_week": week_over_week,
@@ -263,11 +276,24 @@ class WeeklyReportBuilder:
             )
         top_skills.sort(key=lambda x: x["composite_score"], reverse=True)
 
+        # 获取技能总量、总访问量、总下载量、总发布量
+        all_skills = skills_db.read().get("skills", [])
+        total_skills = len(all_skills)
+        total_views = sum(views_map.get(s["slug"], 0) for s in all_skills)
+        total_downloads = sum(s.get("download_count", 0) or 0 for s in all_skills)
+        total_publishes = len([s for s in all_skills if s.get("status") == "approved"])
+
         # 计算数据质量指标
         data_quality = self._calc_data_quality(week_data)
 
         return {
             "week_range": f"{week_start} ~ {week_end}",
+            "summary": {
+                "total_skills": total_skills,
+                "total_views": total_views,
+                "total_downloads": total_downloads,
+                "total_publishes": total_publishes,
+            },
             "this_week": week_data,
             "last_week": last_week_data,
             "week_over_week": week_over_week,

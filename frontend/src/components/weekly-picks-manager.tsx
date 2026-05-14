@@ -12,6 +12,19 @@ interface PickForm {
   reason: string;
 }
 
+interface WeekRecord {
+  id: string;
+  week_number: number;
+  week_start: string;
+  week_end: string;
+  selected_by_name: string;
+  picks: Array<{
+    skill_slug: string;
+    skill_name: string;
+    reason: string;
+  }>;
+}
+
 export function WeeklyPicksManager() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<PickForm[]>([
@@ -19,9 +32,10 @@ export function WeeklyPicksManager() {
     { skill_slug: '', reason: '' },
     { skill_slug: '', reason: '' },
   ]);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<WeekRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [editingWeek, setEditingWeek] = useState<string | null>(null);
 
   // 加载Skill列表
   useEffect(() => {
@@ -83,8 +97,13 @@ export function WeeklyPicksManager() {
     setMessage('');
 
     try {
-      const response = await fetch('/api/admin/weekly-picks', {
-        method: 'POST',
+      const url = editingWeek 
+        ? `/api/admin/weekly-picks/${editingWeek}` 
+        : '/api/admin/weekly-picks';
+      const method = editingWeek ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: 'Bearer admin',
@@ -98,24 +117,70 @@ export function WeeklyPicksManager() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.detail || '设置失败');
+        throw new Error(error.detail || '操作失败');
       }
 
       const data = await response.json();
       if (data.success) {
-        setMessage('本周精选设置成功！');
+        setMessage(editingWeek ? '历史记录更新成功！' : '本周精选设置成功！');
         setSelectedSkills([
           { skill_slug: '', reason: '' },
           { skill_slug: '', reason: '' },
           { skill_slug: '', reason: '' },
         ]);
+        setEditingWeek(null);
         loadHistory();
       }
     } catch (error: any) {
-      setMessage('设置失败: ' + error.message);
+      setMessage('操作失败: ' + error.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEdit = async (weekId: string) => {
+    try {
+      const response = await fetch(`/api/admin/weekly-picks/${weekId}`, {
+        headers: { Authorization: 'Bearer admin' },
+      });
+      
+      if (!response.ok) {
+        throw new Error('获取记录失败');
+      }
+
+      const data = await response.json();
+      if (data.success && data.data) {
+        const week = data.data;
+        const picks = week.picks.map((pick: any) => ({
+          skill_slug: pick.skill_slug,
+          reason: pick.reason,
+        }));
+        
+        // 确保有3个位置
+        while (picks.length < 3) {
+          picks.push({ skill_slug: '', reason: '' });
+        }
+        
+        setSelectedSkills(picks.slice(0, 3));
+        setEditingWeek(weekId);
+        setMessage('');
+        
+        // 滚动到编辑区域
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch (error: any) {
+      setMessage('加载记录失败: ' + error.message);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingWeek(null);
+    setSelectedSkills([
+      { skill_slug: '', reason: '' },
+      { skill_slug: '', reason: '' },
+      { skill_slug: '', reason: '' },
+    ]);
+    setMessage('');
   };
 
   // 获取已选择的Skill名称
@@ -126,9 +191,11 @@ export function WeeklyPicksManager() {
 
   return (
     <div className="space-y-8">
-      {/* 设置本周精选 */}
+      {/* 设置/编辑本周精选 */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">设置本周精选</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          {editingWeek ? '编辑历史精选' : '设置本周精选'}
+        </h3>
 
         {message && (
           <div
@@ -196,13 +263,24 @@ export function WeeklyPicksManager() {
           ))}
         </div>
 
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="mt-4 w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-lg hover:shadow-lg transition-all disabled:opacity-50"
-        >
-          {loading ? '提交中...' : '设置本周精选'}
-        </button>
+        <div className="flex gap-3 mt-4">
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-lg hover:shadow-lg transition-all disabled:opacity-50"
+          >
+            {loading ? '提交中...' : editingWeek ? '更新记录' : '设置本周精选'}
+          </button>
+          
+          {editingWeek && (
+            <button
+              onClick={handleCancelEdit}
+              className="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-all"
+            >
+              取消编辑
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 历史记录 */}
@@ -225,9 +303,17 @@ export function WeeklyPicksManager() {
                       {new Date(week.week_end).toLocaleDateString()}
                     </span>
                   </div>
-                  <span className="text-xs text-gray-500">
-                    精选人: {week.selected_by_name}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-500">
+                      精选人: {week.selected_by_name}
+                    </span>
+                    <button
+                      onClick={() => handleEdit(week.id)}
+                      className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      编辑
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">

@@ -19,6 +19,83 @@ interface UnifiedLog {
   metadata?: any;
 }
 
+// 详情弹窗组件
+function LogDetailModal({ log, onClose }: { log: UnifiedLog | null; onClose: () => void }) {
+  if (!log) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-gray-900">日志详情</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="px-6 py-4 overflow-y-auto">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">时间</p>
+                <p className="text-sm font-medium text-gray-900">{new Date(log.timestamp).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">分类</p>
+                <p className="text-sm font-medium text-gray-900">{log.category}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">类型</p>
+                <p className="text-sm font-medium text-gray-900">{log.action}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">用户</p>
+                <p className="text-sm font-medium text-gray-900">{log.user}</p>
+              </div>
+              {log.skill_id && (
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-500">Skill</p>
+                  <p className="text-sm font-medium text-gray-900">{log.skill_name || log.skill_id}</p>
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 mb-2">详情</p>
+              <div className="bg-gray-50 rounded-lg p-4 border">
+                <pre className="text-sm text-gray-700 whitespace-pre-wrap break-all">
+                  {log.details}
+                </pre>
+              </div>
+            </div>
+            {log.metadata && (
+              <div>
+                <p className="text-sm text-gray-500 mb-2">元数据</p>
+                <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                  <pre className="text-sm text-green-400 font-mono">
+                    {JSON.stringify(log.metadata, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AdminLogViewer({ token }: LogViewerProps) {
   const [activeTab, setActiveTab] = useState<LogType>('all');
   const [logs, setLogs] = useState<UnifiedLog[]>([]);
@@ -26,6 +103,7 @@ export function AdminLogViewer({ token }: LogViewerProps) {
   const [loading, setLoading] = useState(false);
   const [days, setDays] = useState(7);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLog, setSelectedLog] = useState<UnifiedLog | null>(null);
 
   const fetchAllLogs = async () => {
     setLoading(true);
@@ -310,7 +388,7 @@ export function AdminLogViewer({ token }: LogViewerProps) {
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">类型</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">用户</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Skill</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">详情</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -333,10 +411,17 @@ export function AdminLogViewer({ token }: LogViewerProps) {
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {log.skill_name || log.skill_id || '-'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 max-w-md">
-                      <div className="truncate" title={log.details}>
-                        {log.details}
-                      </div>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      <button
+                        onClick={() => setSelectedLog(log)}
+                        className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        查看详情
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -348,6 +433,12 @@ export function AdminLogViewer({ token }: LogViewerProps) {
           </div>
         </div>
       )}
+
+      {/* 详情弹窗 */}
+      <LogDetailModal
+        log={selectedLog}
+        onClose={() => setSelectedLog(null)}
+      />
     </div>
   );
 }

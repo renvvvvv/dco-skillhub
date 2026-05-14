@@ -1521,6 +1521,18 @@ def send_daily_report_manual(request: Request):
         notifier = FeishuNotifier()
         log = notifier.send_daily_report(report_data)
 
+        # 记录到新的日志库
+        expert_db.log_user_activity(
+            activity_type="daily_report_sent",
+            user_id="admin",
+            details={
+                "report_type": "daily",
+                "date": report_data.get("date"),
+                "summary": report_data.get("summary", {}),
+                "send_status": log.status,
+            },
+        )
+
         return {"success": log.status == "success", "data": log.to_dict()}
     except Exception as e:
         return {"success": False, "message": f"发送失败: {str(e)}"}
@@ -1540,6 +1552,18 @@ def send_weekly_report_manual(request: Request):
 
         notifier = FeishuNotifier()
         log = notifier.send_weekly_report(report_data)
+
+        # 记录到新的日志库
+        expert_db.log_user_activity(
+            activity_type="weekly_report_sent",
+            user_id="admin",
+            details={
+                "report_type": "weekly",
+                "week_range": report_data.get("week_range"),
+                "summary": report_data.get("summary", {}),
+                "send_status": log.status,
+            },
+        )
 
         return {"success": log.status == "success", "data": log.to_dict()}
     except Exception as e:
@@ -1564,8 +1588,22 @@ def get_daily_report(request: Request):
     """获取实时日报内容（需要 Bearer Token 鉴权）"""
     verify_report_token(request)
     try:
+        from app.report_builder import DailyReportBuilder
+
         builder = DailyReportBuilder()
         report_data = builder.build()
+
+        # 记录到新的日志库
+        expert_db.log_user_activity(
+            activity_type="daily_report_generated",
+            user_id="system",
+            details={
+                "report_type": "daily",
+                "date": report_data.get("date"),
+                "summary": report_data.get("summary", {}),
+            },
+        )
+
         return {"success": True, "data": report_data}
     except Exception as e:
         return {"success": False, "message": f"生成日报失败: {str(e)}"}
@@ -1576,8 +1614,22 @@ def get_weekly_report(request: Request):
     """获取实时周报内容（需要 Bearer Token 鉴权）"""
     verify_report_token(request)
     try:
+        from app.report_builder import WeeklyReportBuilder
+
         builder = WeeklyReportBuilder()
         report_data = builder.build()
+
+        # 记录到新的日志库
+        expert_db.log_user_activity(
+            activity_type="weekly_report_generated",
+            user_id="system",
+            details={
+                "report_type": "weekly",
+                "week_range": report_data.get("week_range"),
+                "summary": report_data.get("summary", {}),
+            },
+        )
+
         return {"success": True, "data": report_data}
     except Exception as e:
         return {"success": False, "message": f"生成周报失败: {str(e)}"}
@@ -2561,6 +2613,34 @@ def get_weekly_picks():
         if skill:
             # 获取统计数据
             stats = metrics_db.get_skill_stats(pick.get("skill_slug"))
+            # 获取版本信息以读取目录结构
+            versions_data = versions_db.read()
+            versions = versions_data.get("versions", [])
+            skill_versions = [
+                v for v in versions if v.get("skill_id") == skill.get("id")
+            ]
+
+            directory_structure = []
+            if skill_versions:
+                latest_version = max(
+                    skill_versions, key=lambda x: x.get("created_at", "")
+                )
+                storage_path = latest_version.get("storage_path")
+                if storage_path:
+                    skill_path = STORAGE_DIR / storage_path
+                    if skill_path.exists():
+                        try:
+                            import zipfile
+
+                            with zipfile.ZipFile(skill_path, "r") as zf:
+                                directory_structure = [
+                                    name
+                                    for name in zf.namelist()
+                                    if not name.endswith("/")
+                                ]
+                        except Exception:
+                            pass
+
             enriched_picks.append(
                 {
                     "skill_slug": pick.get("skill_slug"),
@@ -2568,9 +2648,12 @@ def get_weekly_picks():
                     "author": skill.get("author_name"),
                     "department": skill.get("author_department"),
                     "reason": pick.get("reason"),
+                    "description": skill.get("description", ""),
+                    "readme": skill.get("readme", ""),
                     "downloads": stats.get("total_downloads", 0),
                     "rating": stats.get("avg_rating", 0),
                     "rating_count": stats.get("total_ratings", 0),
+                    "directory_structure": directory_structure[:20],  # 限制返回数量
                 }
             )
 
@@ -2656,6 +2739,81 @@ def get_weekly_picks_history(limit: int = Query(10, description="返回数量"))
     return {
         "success": True,
         "data": enriched_history,
+    }
+
+
+@app.put("/api/admin/weekly-picks/{week_id}")
+async def update_weekly_picks(week_id: str, request: Request):
+    """更新指定周的精选（支持历史记录编辑）"""
+    data = await request.json()
+    picks = data.get("picks", [])
+    admin_id = data.get("admin_id", "admin")
+    admin_name = data.get("admin_name", "管理员")
+
+    if len(picks) != 3:
+        raise HTTPException(status_code=400, detail="必须选择3个Skill")
+
+    # 验证所有Skill存在
+    skills_data = skills_db.read()
+    skills = skills_data.get("skills", [])
+
+    for pick in picks:
+        skill = next(
+            (s for s in skills if s.get("slug") == pick.get("skill_slug")), None
+        )
+        if not skill:
+            raise HTTPException(
+                status_code=404, detail=f"Skill {pick.get('skill_slug')} 不存在"
+            )
+
+    try:
+        result = weekly_picks_db.update_weekly_picks(
+            week_id=week_id,
+            picks=picks,
+            admin_id=admin_id,
+            admin_name=admin_name,
+        )
+
+        return {
+            "success": True,
+            "data": result,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/api/admin/weekly-picks/{week_id}")
+def get_weekly_pick_by_id(week_id: str):
+    """获取指定周的精选详情（用于编辑）"""
+    week = weekly_picks_db.get_week_by_id(week_id)
+
+    if not week:
+        raise HTTPException(status_code=404, detail="周记录不存在")
+
+    # 获取Skill详细信息
+    data = skills_db.read()
+    skills = data.get("skills", [])
+
+    enriched_picks = []
+    for pick in week.get("picks", []):
+        skill = next(
+            (s for s in skills if s.get("slug") == pick.get("skill_slug")), None
+        )
+        if skill:
+            enriched_picks.append(
+                {
+                    "skill_slug": pick.get("skill_slug"),
+                    "skill_name": skill.get("name"),
+                    "reason": pick.get("reason"),
+                }
+            )
+
+    return {
+        "success": True,
+        "data": {
+            **week,
+            "picks": enriched_picks,
+        },
     }
 
 
