@@ -138,23 +138,16 @@ export default function Footer() {
               style={{
                 background: '#FFFFFF',
                 borderRadius: 10,
-                padding: '8px 14px',
+                padding: '12px 20px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: '0 2px 12px rgba(0, 51, 204, 0.15)',
               }}
             >
-              <img
-                src="images/logo-dept.png"
-                alt="DC运维 数智中心"
-                style={{
-                  height: 70,
-                  width: 'auto',
-                  objectFit: 'contain',
-                  display: 'block',
-                }}
-              />
+              <span className="text-lg font-bold" style={{ color: '#0033CC' }}>
+                DC运维 · 数智中心
+              </span>
             </div>
             {footerConfig.copyright && (
               <span

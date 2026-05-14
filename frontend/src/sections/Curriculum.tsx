@@ -1,10 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import gsap from 'gsap';
 import { capabilitiesConfig } from '../config';
 
 export default function Curriculum() {
-  const navigate = useNavigate();
   const sectionRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -163,7 +161,10 @@ export default function Curriculum() {
                 border: '1px solid #D6E4FF',
                 opacity: 0,
               }}
-              onClick={() => navigate(`/capability/${item.slug}`)}
+              onClick={() => {
+                // 移除路由跳转，避免 Router 错误
+                console.log('Clicked:', item.slug);
+              }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-6px)';
                 e.currentTarget.style.boxShadow = '0 20px 50px rgba(0, 51, 204, 0.14)';

@@ -42,16 +42,9 @@ export default function Navigation() {
         className="no-underline flex items-center"
         style={{ gap: 10 }}
       >
-        <img
-          src="images/logo-project.png"
-          alt="随航守卫"
-          style={{
-            height: 42,
-            width: 'auto',
-            objectFit: 'contain',
-            display: 'block',
-          }}
-        />
+        <div className="text-xl font-bold" style={{ color: '#0033CC' }}>
+          {siteConfig.brandName}
+        </div>
       </a>
 
       <div className="hidden md:flex items-center" style={{ gap: 32 }}>
