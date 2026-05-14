@@ -78,9 +78,11 @@ export default function Curriculum() {
       ref={sectionRef}
       className="relative"
       style={{
-        padding: '150px 5vw',
+        padding: '80px 5vw 150px',
         minHeight: '80vh',
         background: '#F8FAFF',
+        marginTop: '-80px',
+        paddingTop: '160px',
       }}
     >
       <div style={{ maxWidth: 1000, margin: '0 auto' }}>

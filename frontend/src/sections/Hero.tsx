@@ -27,10 +27,11 @@ export default function Hero() {
     >
       <AmberCascades />
       <div
-        className="relative z-10 flex flex-col justify-between pointer-events-none"
+        className="relative z-10 flex flex-col justify-center pointer-events-none"
         style={{
           height: '100%',
-          padding: '28vh 5vw 12vh',
+          padding: '20vh 5vw 20vh',
+          gap: '40px',
         }}
       >
         <div className="flex flex-col items-center text-center">
@@ -147,7 +148,7 @@ export default function Hero() {
         </div>
 
         {heroConfig.ctaText && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: '60px' }} className="pointer-events-auto flex-wrap">
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: '40px' }} className="pointer-events-auto flex-wrap">
             <button
               onClick={() => {
                 window.dispatchEvent(new CustomEvent('navigateToView', { detail: { view: 'home' } }));
