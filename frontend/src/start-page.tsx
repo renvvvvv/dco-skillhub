@@ -1,7 +1,6 @@
 // 新首页 - 整合升级后的设计
 import { useEffect, useRef, useState } from 'react';
 import AmberCascades from './sections/AmberCascades';
-import LiquidGlassButton from './components/LiquidGlassButton';
 import { heroConfig, siteConfig, navigationConfig, capabilitiesConfig, architectureConfig, researchConfig, footerConfig } from './config';
 import gsap from 'gsap';
 
@@ -68,35 +67,62 @@ function Navigation({ onEnter }: { onEnter: () => void }) {
         ))}
       </div>
 
-      {navigationConfig.ctaText && (
+      <div className="flex items-center gap-4">
+        {navigationConfig.ctaText && (
+          <button
+            onClick={onEnter}
+            className="nav-cta hidden md:inline-flex"
+            style={{
+              padding: '8px 20px',
+              borderRadius: 8,
+              background: '#0033CC',
+              color: '#fff',
+              fontFamily: "'Inter', sans-serif",
+              fontWeight: 500,
+              fontSize: 13,
+              textDecoration: 'none',
+              transition: 'all 0.3s ease',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#2B5CFF';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#0033CC';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            {navigationConfig.ctaText}
+          </button>
+        )}
+        
+        {/* 进入系统按钮 */}
         <button
           onClick={onEnter}
-          className="nav-cta hidden md:inline-flex"
           style={{
-            padding: '8px 20px',
+            padding: '8px 16px',
             borderRadius: 8,
-            background: '#0033CC',
-            color: '#fff',
+            background: 'transparent',
+            color: '#0033CC',
             fontFamily: "'Inter', sans-serif",
             fontWeight: 500,
             fontSize: 13,
-            textDecoration: 'none',
-            transition: 'all 0.3s ease',
-            border: 'none',
+            border: '1.5px solid #0033CC',
             cursor: 'pointer',
+            transition: 'all 0.3s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#2B5CFF';
-            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.background = 'rgba(0, 51, 204, 0.05)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#0033CC';
-            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.background = 'transparent';
           }}
         >
-          {navigationConfig.ctaText}
+          进入系统
         </button>
-      )}
+      </div>
     </nav>
   );
 }
@@ -248,12 +274,33 @@ function Hero({ onEnter }: { onEnter: () => void }) {
 
         {heroConfig.ctaText && (
           <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }} className="pointer-events-auto flex-wrap">
-            <LiquidGlassButton
+            <button
               onClick={onEnter}
+              style={{
+                padding: '16px 40px',
+                borderRadius: 999,
+                border: 'none',
+                background: 'linear-gradient(135deg, #0033CC 0%, #2B5CFF 50%, #66A3FF 100%)',
+                color: '#FFFFFF',
+                fontFamily: "'Inter', sans-serif",
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+                boxShadow: '0 4px 20px rgba(0, 51, 204, 0.25)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 51, 204, 0.35)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 51, 204, 0.25)';
+              }}
             >
               <span>🚀</span>
               <span style={{ marginLeft: 6 }}>{heroConfig.ctaText}</span>
-            </LiquidGlassButton>
+            </button>
             <button
               onClick={() => {
                 document.querySelector('#curriculum')?.scrollIntoView({ behavior: 'smooth' });
