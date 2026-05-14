@@ -38,6 +38,19 @@ export default function Navigation() {
         className="no-underline flex items-center"
         style={{ gap: 10, background: 'none', border: 'none', cursor: 'pointer' }}
       >
+        <img 
+          src="/logo.jpg" 
+          alt="随航守卫" 
+          style={{
+            height: 40,
+            width: 'auto',
+            objectFit: 'contain',
+            borderRadius: 8,
+          }}
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
         <div className="text-xl font-bold" style={{ color: '#0033CC' }}>
           {siteConfig.brandName}
         </div>

@@ -1,6 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
 import AmberCascades from './AmberCascades';
-import LiquidGlassButton from '../components/LiquidGlassButton';
 import { heroConfig } from '../config';
 
 export default function Hero() {
@@ -31,7 +30,7 @@ export default function Hero() {
         className="relative z-10 flex flex-col justify-between pointer-events-none"
         style={{
           height: '100%',
-          padding: '28vh 5vw 8vh',
+          padding: '28vh 5vw 12vh',
         }}
       >
         <div className="flex flex-col items-center text-center">
@@ -148,18 +147,39 @@ export default function Hero() {
         </div>
 
         {heroConfig.ctaText && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }} className="pointer-events-auto flex-wrap">
-            <LiquidGlassButton
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: '60px' }} className="pointer-events-auto flex-wrap">
+            <button
               onClick={() => {
-                document.querySelector('#curriculum')?.scrollIntoView({ behavior: 'smooth' });
+                window.dispatchEvent(new CustomEvent('navigateToView', { detail: { view: 'home' } }));
+              }}
+              style={{
+                padding: '16px 40px',
+                borderRadius: 999,
+                border: 'none',
+                background: 'linear-gradient(135deg, #0033CC 0%, #2B5CFF 50%, #66A3FF 100%)',
+                color: '#FFFFFF',
+                fontFamily: "'Inter', sans-serif",
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+                boxShadow: '0 4px 20px rgba(0, 51, 204, 0.25)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 8px 30px rgba(0, 51, 204, 0.35)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 51, 204, 0.25)';
               }}
             >
               <span>🚀</span>
               <span style={{ marginLeft: 6 }}>{heroConfig.ctaText}</span>
-            </LiquidGlassButton>
+            </button>
             <button
               onClick={() => {
-                document.querySelector('#cinematic')?.scrollIntoView({ behavior: 'smooth' });
+                document.querySelector('#curriculum')?.scrollIntoView({ behavior: 'smooth' });
               }}
               style={{
                 padding: '16px 40px',
