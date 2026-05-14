@@ -1318,14 +1318,20 @@ export function SimpleApp() {
             </div>
             
             {/* 中间：导航栏目 */}
-            <nav className="hidden sm:flex bg-gray-100/80 p-1 rounded-xl">
-              {[{ key: 'start', label: '首页' }, { key: 'home', label: '浏览' }, { key: 'publish', label: '发布' }, { key: 'arena', label: 'Skill擂台' }, { key: 'stats', label: '展示' }, { key: 'admin', label: '上线与管理' }, { key: 'webhook', label: 'Webhook日志' }].map((item) => (
-                <button key={item.key} onClick={() => item.key === 'admin' ? handleAdminClick() : item.key === 'webhook' ? handleWebhookClick() : setCurrentView(item.key as any)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${currentView === item.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{item.label}</button>
+            <nav className="hidden sm:flex items-center gap-1">
+              {[{ key: 'start', label: '开始' }, { key: 'home', label: '浏览' }, { key: 'publish', label: '发布' }, { key: 'arena', label: 'Skill擂台' }, { key: 'stats', label: '展示' }, { key: 'admin', label: '上线与管理' }, { key: 'webhook', label: 'Webhook日志' }].map((item) => (
+                <button 
+                  key={item.key} 
+                  onClick={() => item.key === 'admin' ? handleAdminClick() : item.key === 'webhook' ? handleWebhookClick() : setCurrentView(item.key as any)} 
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${currentView === item.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+                >
+                  {item.label}
+                </button>
               ))}
             </nav>
             
             {/* 右侧：空占位，保持对称 */}
-            <div className="w-[100px]"></div>
+            <div className="hidden sm:block w-[100px]"></div>
             
             {/* 移动端下拉 */}
             <div className="sm:hidden">
