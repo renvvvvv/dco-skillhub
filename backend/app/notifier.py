@@ -401,50 +401,66 @@ class FeishuNotifier:
                 }
             )
 
-        # 部门之星（综合评分）
-        top_depts = data.get("top_departments", [])
-        if top_depts:
+        # 融合排行榜（各大区 + 职能中心，排除数智中心）
+        combined_rankings = data.get("combined_rankings", [])
+        if combined_rankings:
             elements.append({"tag": "hr"})
             elements.append(
                 {
                     "tag": "div",
                     "text": {
                         "tag": "lark_md",
-                        "content": "**🏢 部门之星（综合评分 = 发布×0.3 + 下载×0.7）**",
+                        "content": "**🏆 融合排行榜（各大区 + 职能中心）**",
                     },
                 }
             )
-            for i, dept in enumerate(top_depts[:3], 1):
+
+            # 发布量排行
+            elements.append(
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": "**📦 发布量排行**",
+                    },
+                }
+            )
+            publish_sorted = sorted(
+                combined_rankings, key=lambda x: x.get("publishes", 0), reverse=True
+            )[:5]
+            for i, item in enumerate(publish_sorted, 1):
+                type_emoji = "🏢" if item.get("type") == "region" else "🏛"
                 elements.append(
                     {
                         "tag": "div",
                         "text": {
                             "tag": "lark_md",
-                            "content": f"{['🥇', '🥈', '🥉'][i - 1]} {dept['name']}: {dept['publishes']}个技能 | {dept['downloads']}次下载 | 评分:{dept.get('composite_score', 0)}",
+                            "content": f"{['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][i - 1]} {type_emoji} {item['name']}: **{item['publishes']}**个技能",
                         },
                     }
                 )
 
-        # Skill之星（个人综合评分）
-        top_skills = data.get("top_skills", [])
-        if top_skills:
-            elements.append({"tag": "hr"})
+            # 下载量排行
             elements.append(
                 {
                     "tag": "div",
                     "text": {
                         "tag": "lark_md",
-                        "content": "**⭐ Skill之星（综合评分 = 发布×0.3 + 下载×0.7）**",
+                        "content": "**⬇ 下载量排行**",
                     },
                 }
             )
-            for i, skill in enumerate(top_skills[:3], 1):
+            download_sorted = sorted(
+                combined_rankings, key=lambda x: x.get("downloads", 0), reverse=True
+            )[:5]
+            for i, item in enumerate(download_sorted, 1):
+                type_emoji = "🏢" if item.get("type") == "region" else "🏛"
                 elements.append(
                     {
                         "tag": "div",
                         "text": {
                             "tag": "lark_md",
-                            "content": f"{['🥇', '🥈', '🥉'][i - 1]} {skill['name']}: {skill['publishes']}个技能 | {skill['downloads']}次下载 | 评分:{skill.get('composite_score', 0)} | {skill.get('department', '')}",
+                            "content": f"{['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][i - 1]} {type_emoji} {item['name']}: **{item['downloads']}**次下载",
                         },
                     }
                 )

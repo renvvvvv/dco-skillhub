@@ -1760,6 +1760,10 @@ def get_weekly_report(request: Request):
             "summary": current_week_data[
                 "summary"
             ],  # 平台累计数据（技能总量/总访问量/总下载量/总发布量）
+            # 融合排行榜（各大区 + 职能中心，排除数智中心）
+            "combined_rankings": current_week_data.get(
+                "combined_rankings", []
+            ),  # 融合排行榜
             # 排行榜（使用本周数据）
             "top_departments": current_week_data["top_departments"],  # 部门排行榜Top5
             "top_skills": current_week_data["top_skills"],  # 个人排行榜Top5
@@ -2577,6 +2581,215 @@ def get_arena_rankings(
     return {
         "success": True,
         "data": rankings,
+    }
+
+
+@app.get("/api/rankings/regions")
+def get_region_rankings(
+    metric: str = Query(
+        "publishes", description="统计指标: publishes 发布量 | downloads 下载量"
+    ),
+    limit: int = Query(10, description="返回数量"),
+):
+    """
+    获取各大区排行榜（排除数智中心）
+
+    统计范围：华北一区、华北二区、华北三区、华东一区、华东二区、华南区、杭钢、香山、其他区域
+    排除：数智中心及所有职能中心
+    """
+    from app.org_mapping import IDC_REGIONS, get_idc_info
+
+    data = skills_db.read()
+    skills = data.get("skills", [])
+    approved_skills = [s for s in skills if s.get("status") == "approved"]
+
+    # 初始化各大区统计
+    region_stats = {}
+    for region_id, region_info in IDC_REGIONS.items():
+        region_stats[region_id] = {
+            "region_id": region_id,
+            "region_name": region_info["name"],
+            "publishes": 0,
+            "downloads": 0,
+            "skills": [],
+        }
+
+    # 统计各区域的发布量和下载量
+    for skill in approved_skills:
+        dept = skill.get("author_department", "")
+        idc_info = get_idc_info(dept)
+        region_id = idc_info.get("region_id", "")
+
+        # 只统计大区（排除职能中心hq）
+        if region_id and region_id != "hq" and region_id in region_stats:
+            region_stats[region_id]["publishes"] += 1
+            region_stats[region_id]["downloads"] += int(
+                skill.get("download_count", 0) or 0
+            )
+            region_stats[region_id]["skills"].append(skill.get("name"))
+
+    # 根据指标排序
+    rankings = sorted(
+        region_stats.values(),
+        key=lambda x: x.get(metric, 0),
+        reverse=True,
+    )[:limit]
+
+    return {
+        "success": True,
+        "data": {
+            "metric": metric,
+            "metric_label": "发布量" if metric == "publishes" else "下载量",
+            "rankings": rankings,
+        },
+    }
+
+
+@app.get("/api/rankings/centers")
+def get_center_rankings(
+    metric: str = Query(
+        "publishes", description="统计指标: publishes 发布量 | downloads 下载量"
+    ),
+    limit: int = Query(10, description="返回数量"),
+):
+    """
+    获取职能中心排行榜（排除数智中心）
+
+    统计范围：组织中心、体系中心、技术中心、自驾中心、IT中心
+    排除：数智中心
+    """
+    from app.org_mapping import IDC_CENTERS, get_idc_info
+
+    data = skills_db.read()
+    skills = data.get("skills", [])
+    approved_skills = [s for s in skills if s.get("status") == "approved"]
+
+    # 初始化各职能中心统计（排除数智中心）
+    center_stats = {}
+    for center_id, center_info in IDC_CENTERS.items():
+        if center_id != "hq-数智":  # 排除数智中心
+            center_stats[center_id] = {
+                "center_id": center_id,
+                "center_name": center_info["name"],
+                "publishes": 0,
+                "downloads": 0,
+                "skills": [],
+            }
+
+    # 统计各职能中心的发布量和下载量
+    for skill in approved_skills:
+        dept = skill.get("author_department", "")
+        idc_info = get_idc_info(dept)
+        center_id = idc_info.get("center_id", "")
+
+        # 只统计职能中心（排除数智中心）
+        if center_id and center_id != "hq-数智" and center_id in center_stats:
+            center_stats[center_id]["publishes"] += 1
+            center_stats[center_id]["downloads"] += int(
+                skill.get("download_count", 0) or 0
+            )
+            center_stats[center_id]["skills"].append(skill.get("name"))
+
+    # 根据指标排序
+    rankings = sorted(
+        center_stats.values(),
+        key=lambda x: x.get(metric, 0),
+        reverse=True,
+    )[:limit]
+
+    return {
+        "success": True,
+        "data": {
+            "metric": metric,
+            "metric_label": "发布量" if metric == "publishes" else "下载量",
+            "rankings": rankings,
+        },
+    }
+
+
+@app.get("/api/rankings/combined")
+def get_combined_rankings(
+    metric: str = Query(
+        "publishes", description="统计指标: publishes 发布量 | downloads 下载量"
+    ),
+    limit: int = Query(20, description="返回数量"),
+):
+    """
+    获取融合排行榜（各大区 + 职能中心，排除数智中心）
+
+    将各大区和职能中心合并到一个排行榜中，统一排序展示
+    """
+    from app.org_mapping import IDC_REGIONS, IDC_CENTERS, get_idc_info
+
+    data = skills_db.read()
+    skills = data.get("skills", [])
+    approved_skills = [s for s in skills if s.get("status") == "approved"]
+
+    # 初始化统计
+    combined_stats = {}
+
+    # 初始化各大区
+    for region_id, region_info in IDC_REGIONS.items():
+        combined_stats[region_id] = {
+            "id": region_id,
+            "name": region_info["name"],
+            "type": "region",
+            "type_label": "大区",
+            "publishes": 0,
+            "downloads": 0,
+            "skills": [],
+        }
+
+    # 初始化职能中心（排除数智中心）
+    for center_id, center_info in IDC_CENTERS.items():
+        if center_id != "hq-数智":
+            combined_stats[center_id] = {
+                "id": center_id,
+                "name": center_info["name"],
+                "type": "center",
+                "type_label": "中心",
+                "publishes": 0,
+                "downloads": 0,
+                "skills": [],
+            }
+
+    # 统计所有技能的发布量和下载量
+    for skill in approved_skills:
+        dept = skill.get("author_department", "")
+        idc_info = get_idc_info(dept)
+        region_id = idc_info.get("region_id", "")
+        center_id = idc_info.get("center_id", "")
+
+        # 统计到大区
+        if region_id and region_id != "hq" and region_id in combined_stats:
+            combined_stats[region_id]["publishes"] += 1
+            combined_stats[region_id]["downloads"] += int(
+                skill.get("download_count", 0) or 0
+            )
+            combined_stats[region_id]["skills"].append(skill.get("name"))
+
+        # 统计到职能中心（排除数智中心）
+        if center_id and center_id != "hq-数智" and center_id in combined_stats:
+            combined_stats[center_id]["publishes"] += 1
+            combined_stats[center_id]["downloads"] += int(
+                skill.get("download_count", 0) or 0
+            )
+            combined_stats[center_id]["skills"].append(skill.get("name"))
+
+    # 根据指标排序
+    rankings = sorted(
+        combined_stats.values(),
+        key=lambda x: x.get(metric, 0),
+        reverse=True,
+    )[:limit]
+
+    return {
+        "success": True,
+        "data": {
+            "metric": metric,
+            "metric_label": "发布量" if metric == "publishes" else "下载量",
+            "rankings": rankings,
+        },
     }
 
 

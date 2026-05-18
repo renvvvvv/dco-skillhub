@@ -227,11 +227,81 @@ class WeeklyReportBuilder:
             "searches": _calc_trend(target_data["searches"], compare_data["searches"]),
         }
 
-        # 部门统计（综合评分：发布量*0.3 + 下载量*0.7）
+        # 融合排行榜统计（各大区 + 职能中心，排除数智中心）
+        from app.org_mapping import IDC_REGIONS, IDC_CENTERS, get_idc_info
+
         skills_data = skills_db.read()
         skills = skills_data.get("skills", [])
         views_data = views_db.read()
         views_map = views_data.get("views", {})
+
+        # 初始化融合排行榜统计
+        combined_stats = {}
+
+        # 初始化各大区
+        for region_id, region_info in IDC_REGIONS.items():
+            combined_stats[region_id] = {
+                "id": region_id,
+                "name": region_info["name"],
+                "type": "region",
+                "type_label": "大区",
+                "publishes": 0,
+                "downloads": 0,
+                "views": 0,
+                "skills": [],
+            }
+
+        # 初始化职能中心（排除数智中心）
+        for center_id, center_info in IDC_CENTERS.items():
+            if center_id != "hq-数智":
+                combined_stats[center_id] = {
+                    "id": center_id,
+                    "name": center_info["name"],
+                    "type": "center",
+                    "type_label": "中心",
+                    "publishes": 0,
+                    "downloads": 0,
+                    "views": 0,
+                    "skills": [],
+                }
+
+        # 统计所有技能数据
+        for s in skills:
+            dept = s.get("author_department", "")
+            idc_info = get_idc_info(dept)
+            region_id = idc_info.get("region_id", "")
+            center_id = idc_info.get("center_id", "")
+
+            # 统计到大区
+            if region_id and region_id != "hq" and region_id in combined_stats:
+                combined_stats[region_id]["publishes"] += 1
+                combined_stats[region_id]["downloads"] += int(
+                    s.get("download_count", 0) or 0
+                )
+                combined_stats[region_id]["views"] += int(
+                    views_map.get(s["slug"], 0) or 0
+                )
+                combined_stats[region_id]["skills"].append(s.get("name"))
+
+            # 统计到职能中心（排除数智中心）
+            if center_id and center_id != "hq-数智" and center_id in combined_stats:
+                combined_stats[center_id]["publishes"] += 1
+                combined_stats[center_id]["downloads"] += int(
+                    s.get("download_count", 0) or 0
+                )
+                combined_stats[center_id]["views"] += int(
+                    views_map.get(s["slug"], 0) or 0
+                )
+                combined_stats[center_id]["skills"].append(s.get("name"))
+
+        # 转换为列表并排序
+        combined_rankings = sorted(
+            combined_stats.values(),
+            key=lambda x: x["publishes"],
+            reverse=True,
+        )
+
+        # 部门统计（综合评分：发布量*0.3 + 下载量*0.7）
 
         dept_stats: dict = {}
         for s in skills:
@@ -357,6 +427,8 @@ class WeeklyReportBuilder:
                 "publishes": week_over_week["publishes"],  # 发布量环比
                 "searches": week_over_week["searches"],  # 搜索量环比
             },
+            # ========== 融合排行榜（各大区 + 职能中心，排除数智中心） ==========
+            "combined_rankings": combined_rankings,  # 融合排行：包含大区/中心名称、类型、发布数、下载数、浏览数
             # ========== 部门排行榜（Top 5） ==========
             "top_departments": top_departments[
                 :5

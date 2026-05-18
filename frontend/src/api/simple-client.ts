@@ -486,6 +486,42 @@ export async function getArenaRankings(
   return response.json();
 }
 
+// 获取大区排行榜（排除数智中心）
+export async function getRegionRankings(
+  metric: string = 'publishes',
+  limit: number = 10
+): Promise<ApiResponse<any>> {
+  const response = await fetch(
+    `${API_BASE}/rankings/regions?metric=${metric}&limit=${limit}`
+  );
+  if (!response.ok) throw new Error('Failed to get region rankings');
+  return response.json();
+}
+
+// 获取职能中心排行榜（排除数智中心）
+export async function getCenterRankings(
+  metric: string = 'publishes',
+  limit: number = 10
+): Promise<ApiResponse<any>> {
+  const response = await fetch(
+    `${API_BASE}/rankings/centers?metric=${metric}&limit=${limit}`
+  );
+  if (!response.ok) throw new Error('Failed to get center rankings');
+  return response.json();
+}
+
+// 获取融合排行榜（各大区 + 职能中心，排除数智中心）
+export async function getCombinedRankings(
+  metric: string = 'publishes',
+  limit: number = 20
+): Promise<ApiResponse<any>> {
+  const response = await fetch(
+    `${API_BASE}/rankings/combined?metric=${metric}&limit=${limit}`
+  );
+  if (!response.ok) throw new Error('Failed to get combined rankings');
+  return response.json();
+}
+
 // 获取用户ID（基于IP的简单标识）
 function getUserId(): string {
   // 尝试从localStorage获取

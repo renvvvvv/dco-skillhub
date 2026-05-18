@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getSkills, searchSkills, getSkill, publishSkill, updateSkill, deleteSkill, recordView, getStats, getKpi, getTrend, getRealtimeEvents, getSearchAnalysis, adminLogin, getPending, approveSkill, getAuditLogs, trackEvent, getSkillStats, Skill, SkillDetail, StatsData, KpiData, TrendData, RealtimeEvent, SearchAnalysis, AuditLog } from './api/simple-client'
+import { getSkills, searchSkills, getSkill, publishSkill, updateSkill, deleteSkill, recordView, getStats, getKpi, getTrend, getRealtimeEvents, getSearchAnalysis, adminLogin, getPending, approveSkill, getAuditLogs, trackEvent, getSkillStats, getRegionRankings, getCenterRankings, getCombinedRankings, Skill, SkillDetail, StatsData, KpiData, TrendData, RealtimeEvent, SearchAnalysis, AuditLog } from './api/simple-client'
 import { WebhookLogView } from './components/webhook-log-view'
 import { ArenaPage } from './components/arena-page'
 import { SkillRating } from './components/skill-rating'
@@ -458,22 +458,32 @@ function StatsView() {
   const [searchAnalysis, setSearchAnalysis] = useState<SearchAnalysis | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('week')
+  const [regionRankings, setRegionRankings] = useState<any[]>([])
+  const [centerRankings, setCenterRankings] = useState<any[]>([])
+  const [combinedRankings, setCombinedRankings] = useState<any[]>([])
+  const [rankingMetric, setRankingMetric] = useState<'publishes' | 'downloads'>('publishes')
 
   useEffect(() => {
     async function load() {
       try {
-        const [statsRes, kpiRes, trendRes, realtimeRes, searchRes] = await Promise.all([
+        const [statsRes, kpiRes, trendRes, realtimeRes, searchRes, regionRes, centerRes, combinedRes] = await Promise.all([
           getStats(),
           getKpi(),
           getTrend(timeRange === 'today' ? 1 : timeRange === 'week' ? 7 : 30),
           getRealtimeEvents(15),
           getSearchAnalysis(7),
+          getRegionRankings(rankingMetric, 10),
+          getCenterRankings(rankingMetric, 10),
+          getCombinedRankings(rankingMetric, 20),
         ])
         setStats(statsRes.data)
         setKpi(kpiRes.data)
         setTrend(trendRes.data)
         setRealtime(realtimeRes.data || [])
         setSearchAnalysis(searchRes.data)
+        setRegionRankings(regionRes.data?.rankings || [])
+        setCenterRankings(centerRes.data?.rankings || [])
+        setCombinedRankings(combinedRes.data?.rankings || [])
       } catch (err) {
         console.error('加载统计失败', err)
       } finally {
@@ -493,7 +503,7 @@ function StatsView() {
     }, 30000)
 
     return () => clearInterval(interval)
-  }, [timeRange])
+  }, [timeRange, rankingMetric])
 
   if (isLoading) {
     return (
@@ -643,6 +653,197 @@ function StatsView() {
           <CardContent><RankBar items={devSorted} valueKey="count" labelKey="name" colorIndex={3} /></CardContent>
         </Card>
       </div>
+
+      {/* 大区与中心排行榜（排除数智中心） */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <span>🏆</span> 大区与中心排行榜（排除数智中心）
+          </h3>
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            {(['publishes', 'downloads'] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => setRankingMetric(m)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  rankingMetric === m ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {m === 'publishes' ? '发布量' : '下载量'}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* 各大区排行榜 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white text-sm">🏢</span>
+                各大区排行榜
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {regionRankings.map((region, index) => (
+                  <div key={region.region_id} className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                      index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                      index === 1 ? 'bg-gray-100 text-gray-700' :
+                      index === 2 ? 'bg-orange-100 text-orange-700' :
+                      'bg-gray-50 text-gray-500'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium text-gray-900">{region.region_name}</span>
+                        <span className="text-sm font-bold text-gray-900">
+                          {rankingMetric === 'publishes' ? region.publishes : region.downloads}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-emerald-500 to-teal-500 h-2 rounded-full transition-all"
+                          style={{ 
+                            width: `${Math.max(
+                              regionRankings[0]?.[rankingMetric] > 0 
+                                ? (region[rankingMetric] / regionRankings[0][rankingMetric]) * 100 
+                                : 0, 
+                              5
+                            )}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {regionRankings.length === 0 && (
+                  <div className="text-center text-gray-400 py-4">暂无数据</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 职能中心排行榜 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-sm">🏛</span>
+                职能中心排行榜
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {centerRankings.map((center, index) => (
+                  <div key={center.center_id} className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                      index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                      index === 1 ? 'bg-gray-100 text-gray-700' :
+                      index === 2 ? 'bg-orange-100 text-orange-700' :
+                      'bg-gray-50 text-gray-500'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium text-gray-900">{center.center_name}</span>
+                        <span className="text-sm font-bold text-gray-900">
+                          {rankingMetric === 'publishes' ? center.publishes : center.downloads}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all"
+                          style={{ 
+                            width: `${Math.max(
+                              centerRankings[0]?.[rankingMetric] > 0 
+                                ? (center[rankingMetric] / centerRankings[0][rankingMetric]) * 100 
+                                : 0, 
+                              5
+                            )}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {centerRankings.length === 0 && (
+                  <div className="text-center text-gray-400 py-4">暂无数据</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* 融合排行榜（各大区 + 职能中心） */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm">🏆</span>
+            融合排行榜（各大区 + 职能中心）
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {combinedRankings.map((item, index) => (
+              <div key={item.id} className="flex items-center gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                  index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                  index === 1 ? 'bg-gray-100 text-gray-700' :
+                  index === 2 ? 'bg-orange-100 text-orange-700' :
+                  'bg-gray-50 text-gray-500'
+                }`}>
+                  {index + 1}
+                </div>
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        item.type === 'region' 
+                          ? 'bg-emerald-100 text-emerald-700' 
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {item.type_label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500">
+                        发布: <span className="font-medium text-gray-700">{item.publishes}</span>
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        下载: <span className="font-medium text-gray-700">{item.downloads}</span>
+                      </span>
+                      <span className="text-sm font-bold text-purple-600">
+                        {rankingMetric === 'publishes' ? item.publishes : item.downloads}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all"
+                      style={{ 
+                        width: `${Math.max(
+                          combinedRankings[0]?.[rankingMetric] > 0 
+                            ? (item[rankingMetric] / combinedRankings[0][rankingMetric]) * 100 
+                            : 0, 
+                          5
+                        )}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+            {combinedRankings.length === 0 && (
+              <div className="text-center text-gray-400 py-4">暂无数据</div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* 原有补充卡片 */}
       {stats && (
