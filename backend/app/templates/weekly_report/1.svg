@@ -1,0 +1,387 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1400" width="900" height="1400">
+  <defs>
+    <!-- 渐变 -->
+    <linearGradient id="hdrGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa"/>
+      <stop offset="100%" style="stop-color:#3b82f6"/>
+    </linearGradient>
+
+    <linearGradient id="cardBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="100%" style="stop-color:#f8fbff"/>
+    </linearGradient>
+
+    <linearGradient id="barGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#93c5fd"/>
+    </linearGradient>
+
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#fbbf24"/>
+      <stop offset="100%" style="stop-color:#f59e0b"/>
+    </linearGradient>
+
+    <linearGradient id="silverGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#cbd5e1"/>
+      <stop offset="100%" style="stop-color:#94a3b8"/>
+    </linearGradient>
+
+    <linearGradient id="bronzeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#fdba74"/>
+      <stop offset="100%" style="stop-color:#fb923c"/>
+    </linearGradient>
+
+    <filter id="sh" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#3b82f6" flood-opacity="0.1"/>
+    </filter>
+
+    <filter id="shSM" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#3b82f6" flood-opacity="0.08"/>
+    </filter>
+
+    <!-- 六边形底纹 -->
+    <pattern id="hex" x="0" y="0" width="30" height="26" patternUnits="userSpaceOnUse">
+      <path d="M15 0 L30 7.5 L30 22.5 L15 30 L0 22.5 L0 7.5 Z" fill="none" stroke="#bfdbfe" stroke-width="0.4" opacity="0.25"/>
+    </pattern>
+  </defs>
+
+  <!-- ========== 背景 ========== -->
+  <rect width="900" height="1400" fill="#f0f7ff"/>
+  <rect width="900" height="1400" fill="url(#hex)"/>
+
+  <!-- ========== 顶部标题区 ========== -->
+  <rect x="0" y="0" width="900" height="160" fill="url(#hdrGrad)"/>
+
+  <!-- 左侧装饰线 -->
+  <line x1="0" y1="160" x2="900" y2="160" stroke="#1d4ed8" stroke-width="3" opacity="0.3"/>
+
+  <!-- Logo区 -->
+  <g transform="translate(50, 30)">
+    <!-- 圆形蓝底 -->
+    <circle cx="45" cy="50" r="42" fill="#ffffff" opacity="0.95"/>
+    <circle cx="45" cy="50" r="42" fill="url(#hdrGrad)" opacity="0.15"/>
+    <circle cx="45" cy="50" r="42" fill="none" stroke="#ffffff" stroke-width="2.5" opacity="0.9"/>
+
+    <!-- 网络节点图形 -->
+    <circle cx="35" cy="40" r="8" fill="#3b82f6"/>
+    <circle cx="60" cy="35" r="6" fill="#60a5fa"/>
+    <circle cx="55" cy="60" r="7" fill="#2563eb"/>
+    <circle cx="25" cy="58" r="5" fill="#93c5fd"/>
+
+    <!-- 连接线 -->
+    <line x1="35" y1="40" x2="60" y2="35" stroke="#3b82f6" stroke-width="2.5"/>
+    <line x1="35" y1="40" x2="55" y2="60" stroke="#3b82f6" stroke-width="2"/>
+    <line x1="35" y1="40" x2="25" y2="58" stroke="#3b82f6" stroke-width="1.8"/>
+    <line x1="60" y1="35" x2="55" y2="60" stroke="#60a5fa" stroke-width="1.5"/>
+    <line x1="55" y1="60" x2="25" y2="58" stroke="#2563eb" stroke-width="1.5"/>
+
+    <!-- 节点小白点 -->
+    <circle cx="35" cy="40" r="2.5" fill="#ffffff"/>
+    <circle cx="60" cy="35" r="2" fill="#ffffff"/>
+    <circle cx="55" cy="60" r="2.2" fill="#ffffff"/>
+    <circle cx="25" cy="58" r="1.8" fill="#ffffff"/>
+  </g>
+
+  <!-- VNET 文字 -->
+  <text x="180" y="68" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="48" font-weight="bold" fill="#ffffff" letter-spacing="6">VNET</text>
+
+  <!-- 副标题 -->
+  <text x="180" y="100" font-family="'Microsoft YaHei', 'PingFang SC', sans-serif" font-size="20" fill="#dbeafe" letter-spacing="2">数据中心智能运维平台</text>
+
+  <!-- 周报标题 -->
+  <text x="180" y="130" font-family="'Microsoft YaHei', 'PingFang SC', sans-serif" font-size="16" fill="#bfdbfe">SkillHub 技能平台周报</text>
+
+  <!-- 右侧日期 -->
+  <rect x="650" y="25" width="210" height="42" rx="21" fill="#ffffff" opacity="0.15" stroke="#ffffff" stroke-width="1"/>
+  <text x="755" y="52" font-family="'Microsoft YaHei', Arial, sans-serif" font-size="15" fill="#ffffff" text-anchor="middle" font-weight="600">
+    2026-05-04 ~ 05-10
+  </text>
+
+  <!-- ========== 核心指标区 ========== -->
+  <g transform="translate(35, 185)">
+    <!-- 区块标题 -->
+    <rect x="0" y="0" width="830" height="44" rx="8" fill="url(#hdrGrad)" filter="url(#shSM)"/>
+    <text x="18" y="30" font-family="'Microsoft YaHei', sans-serif" font-size="20" font-weight="bold" fill="#ffffff">📈 上周核心指标</text>
+    <text x="560" y="30" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#dbeafe">每个IP每天只计1次浏览</text>
+
+    <!-- 指标卡片1: 浏览量 -->
+    <g transform="translate(0, 58)" filter="url(#sh)">
+      <rect x="0" y="0" width="158" height="130" rx="12" fill="url(#cardBg)" stroke="#dbeafe" stroke-width="1.5"/>
+      <text x="79" y="28" font-family="'Microsoft YaHei', sans-serif" font-size="16" fill="#64748b" text-anchor="middle">👁 浏览量</text>
+      <text x="79" y="65" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="#1e40af" text-anchor="middle">27</text>
+      <rect x="29" y="78" width="100" height="24" rx="12" fill="#fee2e2"/>
+      <text x="79" y="95" font-family="'Microsoft YaHei', sans-serif" font-size="13" fill="#ef4444" text-anchor="middle" font-weight="600">⬇ -50.0%</text>
+      <text x="79" y="120" font-family="'Microsoft YaHei', sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">去重IP/日</text>
+    </g>
+
+    <!-- 卡片2: 下载量 -->
+    <g transform="translate(168, 58)" filter="url(#sh)">
+      <rect x="0" y="0" width="158" height="130" rx="12" fill="url(#cardBg)" stroke="#dbeafe" stroke-width="1.5"/>
+      <text x="79" y="28" font-family="'Microsoft YaHei', sans-serif" font-size="16" fill="#64748b" text-anchor="middle">⬇ 下载量</text>
+      <text x="79" y="65" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="#1e40af" text-anchor="middle">12</text>
+      <rect x="29" y="78" width="100" height="24" rx="12" fill="#fee2e2"/>
+      <text x="79" y="95" font-family="'Microsoft YaHei', sans-serif" font-size="13" fill="#ef4444" text-anchor="middle" font-weight="600">⬇ -47.8%</text>
+      <text x="79" y="120" font-family="'Microsoft YaHei', sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">每次下载计1次</text>
+    </g>
+
+    <!-- 卡片3: 发布量 -->
+    <g transform="translate(336, 58)" filter="url(#sh)">
+      <rect x="0" y="0" width="158" height="130" rx="12" fill="url(#cardBg)" stroke="#dbeafe" stroke-width="1.5"/>
+      <text x="79" y="28" font-family="'Microsoft YaHei', sans-serif" font-size="16" fill="#64748b" text-anchor="middle">📦 发布量</text>
+      <text x="79" y="65" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="#1e40af" text-anchor="middle">7</text>
+      <rect x="29" y="78" width="100" height="24" rx="12" fill="#fee2e2"/>
+      <text x="79" y="95" font-family="'Microsoft YaHei', sans-serif" font-size="13" fill="#ef4444" text-anchor="middle" font-weight="600">⬇ -30.0%</text>
+      <text x="79" y="120" font-family="'Microsoft YaHei', sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">审核通过技能</text>
+    </g>
+
+    <!-- 卡片4: 搜索量 -->
+    <g transform="translate(504, 58)" filter="url(#sh)">
+      <rect x="0" y="0" width="158" height="130" rx="12" fill="url(#cardBg)" stroke="#dbeafe" stroke-width="1.5"/>
+      <text x="79" y="28" font-family="'Microsoft YaHei', sans-serif" font-size="16" fill="#64748b" text-anchor="middle">🔍 搜索量</text>
+      <text x="79" y="65" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="#1e40af" text-anchor="middle">62</text>
+      <rect x="29" y="78" width="100" height="24" rx="12" fill="#fef3c7"/>
+      <text x="79" y="95" font-family="'Microsoft YaHei', sans-serif" font-size="13" fill="#d97706" text-anchor="middle" font-weight="600">➖</text>
+      <text x="79" y="120" font-family="'Microsoft YaHei', sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">每次搜索计1次</text>
+    </g>
+
+    <!-- 卡片5: 用户 -->
+    <g transform="translate(672, 58)" filter="url(#sh)">
+      <rect x="0" y="0" width="158" height="130" rx="12" fill="url(#cardBg)" stroke="#dbeafe" stroke-width="1.5"/>
+      <text x="79" y="28" font-family="'Microsoft YaHei', sans-serif" font-size="16" fill="#64748b" text-anchor="middle">👤 用户</text>
+      <text x="79" y="65" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="#1e40af" text-anchor="middle">3</text>
+      <rect x="29" y="78" width="100" height="24" rx="12" fill="#f1f5f9"/>
+      <text x="79" y="95" font-family="'Microsoft YaHei', sans-serif" font-size="13" fill="#64748b" text-anchor="middle" font-weight="600">-</text>
+      <text x="79" y="120" font-family="'Microsoft YaHei', sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">有操作行为用户</text>
+    </g>
+  </g>
+
+  <!-- ========== 部门之星 ========== -->
+  <g transform="translate(35, 420)">
+    <rect x="0" y="0" width="830" height="44" rx="8" fill="url(#hdrGrad)" filter="url(#shSM)"/>
+    <text x="18" y="30" font-family="'Microsoft YaHei', sans-serif" font-size="20" font-weight="bold" fill="#ffffff">🏢 部门之星</text>
+    <text x="560" y="30" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#dbeafe">综合评分 = 发布×0.3 + 下载×0.7</text>
+
+    <!-- 🥇 第1名 -->
+    <g transform="translate(0, 56)" filter="url(#sh)">
+      <rect x="0" y="0" width="830" height="90" rx="12" fill="url(#cardBg)" stroke="#fbbf24" stroke-width="2"/>
+      <rect x="0" y="0" width="8" height="90" rx="4" fill="url(#goldGrad)"/>
+
+      <!-- 排名 -->
+      <text x="45" y="55" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#d97706" text-anchor="middle">1</text>
+      <text x="75" y="55" font-family="'Segoe UI Emoji', sans-serif" font-size="28" text-anchor="middle">🥇</text>
+
+      <!-- 部门名 -->
+      <text x="120" y="38" font-family="'Microsoft YaHei', sans-serif" font-size="20" font-weight="bold" fill="#1e40af">数智中心</text>
+      <text x="120" y="58" font-family="'Microsoft YaHei', sans-serif" font-size="14" fill="#64748b">数据中心核心部门</text>
+
+      <!-- 技能数 -->
+      <rect x="320" y="15" width="120" height="55" rx="10" fill="#eff6ff" stroke="#dbeafe"/>
+      <text x="380" y="35" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#64748b" text-anchor="middle">技能数</text>
+      <text x="380" y="58" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#2563eb" text-anchor="middle">32</text>
+
+      <!-- 下载数 -->
+      <rect x="450" y="15" width="120" height="55" rx="10" fill="#eff6ff" stroke="#dbeafe"/>
+      <text x="510" y="35" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#64748b" text-anchor="middle">下载次数</text>
+      <text x="510" y="58" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#2563eb" text-anchor="middle">109</text>
+
+      <!-- 评分 -->
+      <g transform="translate(680, 10)">
+        <circle cx="35" cy="35" r="30" fill="none" stroke="#fef3c7" stroke-width="7"/>
+        <circle cx="35" cy="35" r="30" fill="none" stroke="#f59e0b" stroke-width="7" stroke-dasharray="165 220" stroke-linecap="round" transform="rotate(-90 35 35)"/>
+        <text x="35" y="31" font-family="'Microsoft YaHei', sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">综合评分</text>
+        <text x="35" y="50" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#d97706" text-anchor="middle">85.9</text>
+      </g>
+    </g>
+
+    <!-- 🥈 第2名 -->
+    <g transform="translate(0, 156)" filter="url(#sh)">
+      <rect x="0" y="0" width="830" height="90" rx="12" fill="url(#cardBg)" stroke="#cbd5e1" stroke-width="2"/>
+      <rect x="0" y="0" width="8" height="90" rx="4" fill="url(#silverGrad)"/>
+
+      <text x="45" y="55" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#64748b" text-anchor="middle">2</text>
+      <text x="75" y="55" font-family="'Segoe UI Emoji', sans-serif" font-size="28" text-anchor="middle">🥈</text>
+
+      <text x="120" y="38" font-family="'Microsoft YaHei', sans-serif" font-size="20" font-weight="bold" fill="#334155">成都双流</text>
+      <text x="120" y="58" font-family="'Microsoft YaHei', sans-serif" font-size="14" fill="#94a3b8">区域数据中心</text>
+
+      <rect x="320" y="15" width="120" height="55" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text x="380" y="35" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">技能数</text>
+      <text x="380" y="58" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#64748b" text-anchor="middle">1</text>
+
+      <rect x="450" y="15" width="120" height="55" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text x="510" y="35" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">下载次数</text>
+      <text x="510" y="58" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#64748b" text-anchor="middle">3</text>
+
+      <g transform="translate(680, 10)">
+        <circle cx="35" cy="35" r="30" fill="none" stroke="#f1f5f9" stroke-width="7"/>
+        <circle cx="35" cy="35" r="30" fill="none" stroke="#94a3b8" stroke-width="7" stroke-dasharray="24 220" stroke-linecap="round" transform="rotate(-90 35 35)"/>
+        <text x="35" y="31" font-family="'Microsoft YaHei', sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">综合评分</text>
+        <text x="35" y="50" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#64748b" text-anchor="middle">2.4</text>
+      </g>
+    </g>
+
+    <!-- 🥉 第3名 -->
+    <g transform="translate(0, 256)" filter="url(#sh)">
+      <rect x="0" y="0" width="830" height="90" rx="12" fill="url(#cardBg)" stroke="#fdba74" stroke-width="2"/>
+      <rect x="0" y="0" width="8" height="90" rx="4" fill="url(#bronzeGrad)"/>
+
+      <text x="45" y="55" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#c2410c" text-anchor="middle">3</text>
+      <text x="75" y="55" font-family="'Segoe UI Emoji', sans-serif" font-size="28" text-anchor="middle">🥉</text>
+
+      <text x="120" y="38" font-family="'Microsoft YaHei', sans-serif" font-size="20" font-weight="bold" fill="#334155">华东一部</text>
+      <text x="120" y="58" font-family="'Microsoft YaHei', sans-serif" font-size="14" fill="#9a3412">华东区域节点</text>
+
+      <rect x="320" y="15" width="120" height="55" rx="10" fill="#fff7ed" stroke="#fed7aa"/>
+      <text x="380" y="35" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#9a3412" text-anchor="middle">技能数</text>
+      <text x="380" y="58" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#c2410c" text-anchor="middle">2</text>
+
+      <rect x="450" y="15" width="120" height="55" rx="10" fill="#fff7ed" stroke="#fed7aa"/>
+      <text x="510" y="35" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#9a3412" text-anchor="middle">下载次数</text>
+      <text x="510" y="58" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#c2410c" text-anchor="middle">2</text>
+
+      <g transform="translate(680, 10)">
+        <circle cx="35" cy="35" r="30" fill="none" stroke="#fff7ed" stroke-width="7"/>
+        <circle cx="35" cy="35" r="30" fill="none" stroke="#fb923c" stroke-width="7" stroke-dasharray="20 220" stroke-linecap="round" transform="rotate(-90 35 35)"/>
+        <text x="35" y="31" font-family="'Microsoft YaHei', sans-serif" font-size="11" fill="#9a3412" text-anchor="middle">综合评分</text>
+        <text x="35" y="50" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#c2410c" text-anchor="middle">2.0</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ========== 热门Skill榜 (下载量最多) ========== -->
+  <g transform="translate(35, 800)">
+    <rect x="0" y="0" width="830" height="44" rx="8" fill="url(#hdrGrad)" filter="url(#shSM)"/>
+    <text x="18" y="30" font-family="'Microsoft YaHei', sans-serif" font-size="20" font-weight="bold" fill="#ffffff">🔥 热门技能榜（下载量TOP3）</text>
+
+    <!-- 🥇 Skill 第1名 -->
+    <g transform="translate(0, 56)" filter="url(#sh)">
+      <rect x="0" y="0" width="830" height="110" rx="12" fill="url(#cardBg)" stroke="#fbbf24" stroke-width="2"/>
+      <rect x="0" y="0" width="8" height="110" rx="4" fill="url(#goldGrad)"/>
+
+      <text x="40" y="60" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#d97706" text-anchor="middle">1</text>
+
+      <!-- Skill图标 -->
+      <g transform="translate(70, 25)">
+        <rect x="0" y="0" width="58" height="58" rx="12" fill="#eff6ff" stroke="#dbeafe" stroke-width="2"/>
+        <text x="29" y="40" font-family="Arial, sans-serif" font-size="26" text-anchor="middle">⚡</text>
+      </g>
+
+      <!-- Skill名字 -->
+      <text x="145" y="40" font-family="'Microsoft YaHei', sans-serif" font-size="20" font-weight="bold" fill="#1e40af">AI智能诊断助手</text>
+      <text x="145" y="62" font-family="'Microsoft YaHei', sans-serif" font-size="14" fill="#64748b">基于大模型的故障自动诊断与修复建议</text>
+      <text x="145" y="82" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#94a3b8">作者：高扬 | 部门：数智中心</text>
+
+      <!-- 下载量 -->
+      <g transform="translate(600, 15)">
+        <rect x="0" y="0" width="130" height="78" rx="12" fill="#eff6ff" stroke="#dbeafe"/>
+        <text x="65" y="28" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#64748b" text-anchor="middle">本周下载</text>
+        <text x="65" y="58" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#2563eb" text-anchor="middle">48</text>
+      </g>
+
+      <!-- 热度条 -->
+      <g transform="translate(745, 30)">
+        <text x="0" y="0" font-family="'Microsoft YaHei', sans-serif" font-size="11" fill="#94a3b8">热度</text>
+        <rect x="0" y="10" width="60" height="10" rx="5" fill="#e2e8f0"/>
+        <rect x="0" y="10" width="58" height="10" rx="5" fill="url(#goldGrad)"/>
+        <text x="30" y="42" font-family="Arial, sans-serif" font-size="12" fill="#d97706" text-anchor="middle" font-weight="bold">TOP1</text>
+      </g>
+    </g>
+
+    <!-- 🥈 Skill 第2名 -->
+    <g transform="translate(0, 176)" filter="url(#sh)">
+      <rect x="0" y="0" width="830" height="110" rx="12" fill="url(#cardBg)" stroke="#cbd5e1" stroke-width="2"/>
+      <rect x="0" y="0" width="8" height="110" rx="4" fill="url(#silverGrad)"/>
+
+      <text x="40" y="60" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#64748b" text-anchor="middle">2</text>
+
+      <g transform="translate(70, 25)">
+        <rect x="0" y="0" width="58" height="58" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="2"/>
+        <text x="29" y="40" font-family="Arial, sans-serif" font-size="26" text-anchor="middle">🔧</text>
+      </g>
+
+      <text x="145" y="40" font-family="'Microsoft YaHei', sans-serif" font-size="20" font-weight="bold" fill="#334155">自动化运维脚本集</text>
+      <text x="145" y="62" font-family="'Microsoft YaHei', sans-serif" font-size="14" fill="#64748b">常用运维场景的Python/Bash脚本集合</text>
+      <text x="145" y="82" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#94a3b8">作者：邓昊 | 部门：数智中心</text>
+
+      <g transform="translate(600, 15)">
+        <rect x="0" y="0" width="130" height="78" rx="12" fill="#f8fafc" stroke="#e2e8f0"/>
+        <text x="65" y="28" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">本周下载</text>
+        <text x="65" y="58" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#64748b" text-anchor="middle">30</text>
+      </g>
+
+      <g transform="translate(745, 30)">
+        <text x="0" y="0" font-family="'Microsoft YaHei', sans-serif" font-size="11" fill="#94a3b8">热度</text>
+        <rect x="0" y="10" width="60" height="10" rx="5" fill="#e2e8f0"/>
+        <rect x="0" y="10" width="42" height="10" rx="5" fill="url(#silverGrad)"/>
+        <text x="30" y="42" font-family="Arial, sans-serif" font-size="12" fill="#64748b" text-anchor="middle" font-weight="bold">TOP2</text>
+      </g>
+    </g>
+
+    <!-- 🥉 Skill 第3名 -->
+    <g transform="translate(0, 296)" filter="url(#sh)">
+      <rect x="0" y="0" width="830" height="110" rx="12" fill="url(#cardBg)" stroke="#fdba74" stroke-width="2"/>
+      <rect x="0" y="0" width="8" height="110" rx="4" fill="url(#bronzeGrad)"/>
+
+      <text x="40" y="60" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#c2410c" text-anchor="middle">3</text>
+
+      <g transform="translate(70, 25)">
+        <rect x="0" y="0" width="58" height="58" rx="12" fill="#fff7ed" stroke="#fed7aa" stroke-width="2"/>
+        <text x="29" y="40" font-family="Arial, sans-serif" font-size="26" text-anchor="middle">📊</text>
+      </g>
+
+      <text x="145" y="40" font-family="'Microsoft YaHei', sans-serif" font-size="20" font-weight="bold" fill="#334155">数据中心监控面板</text>
+      <text x="145" y="62" font-family="'Microsoft YaHei', sans-serif" font-size="14" fill="#9a3412">实时展示VNet流量、负载、告警信息</text>
+      <text x="145" y="82" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#b45309">作者：魏宁 | 部门：成都双流</text>
+
+      <g transform="translate(600, 15)">
+        <rect x="0" y="0" width="130" height="78" rx="12" fill="#fff7ed" stroke="#fed7aa"/>
+        <text x="65" y="28" font-family="'Microsoft YaHei', sans-serif" font-size="12" fill="#9a3412" text-anchor="middle">本周下载</text>
+        <text x="65" y="58" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#c2410c" text-anchor="middle">22</text>
+      </g>
+
+      <g transform="translate(745, 30)">
+        <text x="0" y="0" font-family="'Microsoft YaHei', sans-serif" font-size="11" fill="#c2410c">热度</text>
+        <rect x="0" y="10" width="60" height="10" rx="5" fill="#fed7aa" opacity="0.5"/>
+        <rect x="0" y="10" width="28" height="10" rx="5" fill="url(#bronzeGrad)"/>
+        <text x="30" y="42" font-family="Arial, sans-serif" font-size="12" fill="#c2410c" text-anchor="middle" font-weight="bold">TOP3</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ========== 页脚 ========== -->
+  <g transform="translate(0, 1250)">
+    <line x1="35" y1="0" x2="865" y2="0" stroke="#dbeafe" stroke-width="1" stroke-dasharray="8,4"/>
+
+    <text x="450" y="40" font-family="'Microsoft YaHei', 'PingFang SC', sans-serif" font-size="16" fill="#94a3b8" text-anchor="middle">
+      VNet 数据中心 · 运维部 · 数据驱动运营
+    </text>
+    <text x="450" y="65" font-family="Arial, sans-serif" font-size="13" fill="#cbd5e1" text-anchor="middle">
+      Powered by SkillHub | Weekly Report System
+    </text>
+
+    <!-- 右侧服务器小图标 -->
+    <g transform="translate(780, 30)">
+      <rect x="0" y="0" width="16" height="20" rx="2" fill="#cbd5e1"/>
+      <circle cx="5" cy="7" r="2" fill="#10b981"/>
+      <circle cx="11" cy="7" r="2" fill="#10b981"/>
+      <line x1="4" y1="14" x2="12" y2="14" stroke="#94a3b8" stroke-width="1"/>
+    </g>
+    <g transform="translate(802, 30)">
+      <rect x="0" y="0" width="16" height="20" rx="2" fill="#cbd5e1"/>
+      <circle cx="5" cy="7" r="2" fill="#f59e0b"/>
+      <circle cx="11" cy="7" r="2" fill="#10b981"/>
+      <line x1="4" y1="14" x2="12" y2="14" stroke="#94a3b8" stroke-width="1"/>
+    </g>
+    <g transform="translate(824, 30)">
+      <rect x="0" y="0" width="16" height="20" rx="2" fill="#cbd5e1"/>
+      <circle cx="5" cy="7" r="2" fill="#10b981"/>
+      <circle cx="11" cy="7" r="2" fill="#10b981"/>
+      <line x1="4" y1="14" x2="12" y2="14" stroke="#94a3b8" stroke-width="1"/>
+    </g>
+
+    <!-- 状态灯 -->
+    <circle cx="855" cy="55" r="5" fill="#10b981" opacity="0.8"/>
+    <text x="845" y="82" font-family="Arial, sans-serif" font-size="10" fill="#94a3b8" text-anchor="end">ALL SYSTEMS OPERATIONAL</text>
+  </g>
+
+</svg>

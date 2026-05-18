@@ -8,16 +8,46 @@ import base64
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
-from app.config import FEISHU_WEBHOOK_URL, FEISHU_WEBHOOK_SECRET, QUICK_APPROVE_TOKEN
+from app.config import (
+    FEISHU_WEBHOOK_URL,
+    FEISHU_WEBHOOK_SECRET,
+    FEISHU_WEBHOOK_URL_EXTERNAL,
+    FEISHU_WEBHOOK_SECRET_EXTERNAL,
+    QUICK_APPROVE_TOKEN,
+)
+from app.timezone_utils import get_beijing_time, get_beijing_datetime
 from app.webhook_logs import WebhookLog, WebhookLogService
 
 
 class FeishuNotifier:
-    """飞书机器人通知器"""
+    """飞书机器人通知器 - 支持双通道"""
 
-    def __init__(self, webhook_url: Optional[str] = None, secret: Optional[str] = None):
-        self.webhook_url = webhook_url or FEISHU_WEBHOOK_URL
-        self.secret = secret or FEISHU_WEBHOOK_SECRET
+    def __init__(
+        self,
+        webhook_url: Optional[str] = None,
+        secret: Optional[str] = None,
+        channel: str = "internal",
+    ):
+        """
+        初始化通知器
+
+        Args:
+            webhook_url: 自定义webhook地址
+            secret: 自定义签名密钥
+            channel: 通道类型 - internal 内部通道 | external 外部通道
+        """
+        self.channel = channel
+        if webhook_url:
+            self.webhook_url = webhook_url
+            self.secret = secret or ""
+        elif channel == "external":
+            # 外部通道
+            self.webhook_url = FEISHU_WEBHOOK_URL_EXTERNAL
+            self.secret = FEISHU_WEBHOOK_SECRET_EXTERNAL
+        else:
+            # 内部通道（默认）
+            self.webhook_url = FEISHU_WEBHOOK_URL
+            self.secret = FEISHU_WEBHOOK_SECRET
 
     def _gen_sign(self, timestamp: int) -> str:
         """生成飞书签名"""
@@ -35,11 +65,11 @@ class FeishuNotifier:
 
         log = WebhookLog(
             type=log_type,
-            channel="feishu",
+            channel=self.channel,
             status="pending",
             webhook_url=self.webhook_url,
             request_body=message,
-            sent_at=datetime.now().isoformat(),
+            sent_at=get_beijing_datetime(),
         )
 
         payload = {
@@ -64,7 +94,7 @@ class FeishuNotifier:
             except:
                 log.response_body = {"text": response.text}
             log.duration_ms = duration_ms
-            log.completed_at = datetime.now().isoformat()
+            log.completed_at = get_beijing_datetime()
 
             resp_data = log.response_body
             if response.status_code == 200 and resp_data.get("code") == 0:
@@ -77,7 +107,7 @@ class FeishuNotifier:
             log.status = "failed"
             log.error_message = str(e)
             log.duration_ms = int((time.time() - start_time) * 1000)
-            log.completed_at = datetime.now().isoformat()
+            log.completed_at = get_beijing_datetime()
 
         WebhookLogService.record(log)
         return log
@@ -507,31 +537,47 @@ class FeishuNotifier:
                 }
             )
 
-        # 添加操作按钮
+        # 添加操作按钮 - 外部通道只保留下载按钮，移除查看/通过/拒绝按钮
         elements.append({"tag": "hr"})
+        actions = []
+
+        if self.channel == "external":
+            # 外部通道：只保留下载按钮
+            actions.append(
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "⬇️ 下载"},
+                    "type": "primary",
+                    "url": f"http://211.154.18.252:10143/api/skills/{skill.get('slug', '')}/download",
+                }
+            )
+        else:
+            # 内部通道：保留所有操作按钮
+            actions = [
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "📋 查看详情"},
+                    "type": "primary",
+                    "url": f"http://211.154.18.252:10143/admin",
+                },
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "✅ 通过"},
+                    "type": "primary",
+                    "url": f"http://211.154.18.252:10143/api/admin/approve-quick?slug={skill.get('slug', '')}&action=approve&token={QUICK_APPROVE_TOKEN}",
+                },
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "❌ 拒绝"},
+                    "type": "danger",
+                    "url": f"http://211.154.18.252:10143/api/admin/approve-quick?slug={skill.get('slug', '')}&action=reject&token={QUICK_APPROVE_TOKEN}",
+                },
+            ]
+
         elements.append(
             {
                 "tag": "action",
-                "actions": [
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": "📋 查看详情"},
-                        "type": "primary",
-                        "url": f"http://211.154.18.252:10143/admin",
-                    },
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": "✅ 通过"},
-                        "type": "primary",
-                        "url": f"http://211.154.18.252:10143/api/admin/approve-quick?slug={skill.get('slug', '')}&action=approve&token={QUICK_APPROVE_TOKEN}",
-                    },
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": "❌ 拒绝"},
-                        "type": "danger",
-                        "url": f"http://211.154.18.252:10143/api/admin/approve-quick?slug={skill.get('slug', '')}&action=reject&token={QUICK_APPROVE_TOKEN}",
-                    },
-                ],
+                "actions": actions,
             }
         )
 
@@ -548,6 +594,99 @@ class FeishuNotifier:
 
     def _build_publish_approve_card(self, skill: dict, admin_name: str) -> dict:
         """构建审批通过卡片（给提交人）"""
+        elements = [
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": f"**📦 技能名称**：{skill.get('name', '')}",
+                },
+            },
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": f"**👤 开发者**：{skill.get('author_name', '')}",
+                },
+            },
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": f"**🏢 所属部门**：{skill.get('author_department', '')}",
+                },
+            },
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": f"**👤 审批人**：{admin_name}",
+                },
+            },
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": f"**📅 审批时间**：{get_beijing_time().strftime('%Y-%m-%d %H:%M')}",
+                },
+            },
+        ]
+
+        # 添加技能描述
+        description = skill.get("description", "")
+        if description:
+            elements.append({"tag": "hr"})
+            elements.append(
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": f"**📝 技能描述**：\n{description[:200]}{'...' if len(description) > 200 else ''}",
+                    },
+                }
+            )
+
+        elements.append({"tag": "hr"})
+        elements.append(
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": "🎉 **技能已通过审核，已正式上线！**",
+                },
+            }
+        )
+
+        # 操作按钮
+        elements.append(
+            {
+                "tag": "action",
+                "actions": [
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "⬇️ 下载"},
+                        "type": "primary",
+                        "url": f"http://211.154.18.252:10143/api/skills/{skill.get('slug', '')}/download",
+                    },
+                ]
+                if self.channel == "external"
+                else [
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "🔗 查看技能"},
+                        "type": "primary",
+                        "url": f"http://211.154.18.252:10143/skills/{skill.get('slug', '')}",
+                    },
+                    {
+                        "tag": "button",
+                        "text": {"tag": "plain_text", "content": "⬇️ 下载"},
+                        "type": "default",
+                        "url": f"http://211.154.18.252:10143/api/skills/{skill.get('slug', '')}/download",
+                    },
+                ],
+            }
+        )
+
         return {
             "msg_type": "interactive",
             "card": {
@@ -555,54 +694,7 @@ class FeishuNotifier:
                     "title": {"tag": "plain_text", "content": "✅ 技能发布申请已通过"},
                     "template": "green",
                 },
-                "elements": [
-                    {
-                        "tag": "div",
-                        "text": {
-                            "tag": "lark_md",
-                            "content": f"**📦 技能名称**：{skill.get('name', '')}",
-                        },
-                    },
-                    {
-                        "tag": "div",
-                        "text": {
-                            "tag": "lark_md",
-                            "content": f"**👤 审批人**：{admin_name}",
-                        },
-                    },
-                    {
-                        "tag": "div",
-                        "text": {
-                            "tag": "lark_md",
-                            "content": f"**📅 审批时间**：{datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                        },
-                    },
-                    {"tag": "hr"},
-                    {
-                        "tag": "div",
-                        "text": {
-                            "tag": "lark_md",
-                            "content": "🎉 **您的技能已通过审核，已正式上线！**",
-                        },
-                    },
-                    {
-                        "tag": "action",
-                        "actions": [
-                            {
-                                "tag": "button",
-                                "text": {"tag": "plain_text", "content": "🔗 查看技能"},
-                                "type": "primary",
-                                "url": f"http://211.154.18.252:10143/skills/{skill.get('slug', '')}",
-                            },
-                            {
-                                "tag": "button",
-                                "text": {"tag": "plain_text", "content": "⬇️ 下载"},
-                                "type": "default",
-                                "url": f"http://211.154.18.252:10143/api/skills/{skill.get('slug', '')}/download",
-                            },
-                        ],
-                    },
-                ],
+                "elements": elements,
             },
         }
 
@@ -626,7 +718,7 @@ class FeishuNotifier:
                 "tag": "div",
                 "text": {
                     "tag": "lark_md",
-                    "content": f"**📅 审批时间**：{datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                    "content": f"**📅 审批时间**：{get_beijing_time().strftime('%Y-%m-%d %H:%M')}",
                 },
             },
         ]
@@ -644,17 +736,33 @@ class FeishuNotifier:
             )
 
         elements.append({"tag": "hr"})
+        actions = []
+
+        if self.channel == "external":
+            # 外部通道：只保留下载按钮
+            actions.append(
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "⬇️ 下载"},
+                    "type": "primary",
+                    "url": f"http://211.154.18.252:10143/api/skills/{skill.get('slug', '')}/download",
+                }
+            )
+        else:
+            # 内部通道：保留修改按钮
+            actions.append(
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "📝 修改重新提交"},
+                    "type": "primary",
+                    "url": f"http://211.154.18.252:10143/admin",
+                }
+            )
+
         elements.append(
             {
                 "tag": "action",
-                "actions": [
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": "📝 修改重新提交"},
-                        "type": "primary",
-                        "url": f"http://211.154.18.252:10143/admin",
-                    },
-                ],
+                "actions": actions,
             }
         )
 
@@ -694,7 +802,7 @@ class FeishuNotifier:
                 "tag": "div",
                 "text": {
                     "tag": "lark_md",
-                    "content": f"**📅 提交时间**：{datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                    "content": f"**📅 提交时间**：{get_beijing_time().strftime('%Y-%m-%d %H:%M')}",
                 },
             },
         ]
@@ -713,31 +821,47 @@ class FeishuNotifier:
                 }
             )
 
-        # 添加操作按钮
+        # 添加操作按钮 - 外部通道只保留下载按钮
         elements.append({"tag": "hr"})
+        actions = []
+
+        if self.channel == "external":
+            # 外部通道：只保留下载按钮
+            actions.append(
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "⬇️ 下载"},
+                    "type": "primary",
+                    "url": f"http://211.154.18.252:10143/api/skills/{skill.get('slug', '')}/download",
+                }
+            )
+        else:
+            # 内部通道：保留所有操作按钮
+            actions = [
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "📋 查看详情"},
+                    "type": "primary",
+                    "url": f"http://211.154.18.252:10143/admin",
+                },
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "✅ 通过"},
+                    "type": "primary",
+                    "url": f"http://211.154.18.252:10143/api/admin/approve-quick?slug={skill.get('slug', '')}&action=approve&token={QUICK_APPROVE_TOKEN}",
+                },
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "❌ 拒绝"},
+                    "type": "danger",
+                    "url": f"http://211.154.18.252:10143/api/admin/approve-quick?slug={skill.get('slug', '')}&action=reject&token={QUICK_APPROVE_TOKEN}",
+                },
+            ]
+
         elements.append(
             {
                 "tag": "action",
-                "actions": [
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": "📋 查看详情"},
-                        "type": "primary",
-                        "url": f"http://211.154.18.252:10143/admin",
-                    },
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": "✅ 通过"},
-                        "type": "primary",
-                        "url": f"http://211.154.18.252:10143/api/admin/approve-quick?slug={skill.get('slug', '')}&action=approve&token={QUICK_APPROVE_TOKEN}",
-                    },
-                    {
-                        "tag": "button",
-                        "text": {"tag": "plain_text", "content": "❌ 拒绝"},
-                        "type": "danger",
-                        "url": f"http://211.154.18.252:10143/api/admin/approve-quick?slug={skill.get('slug', '')}&action=reject&token={QUICK_APPROVE_TOKEN}",
-                    },
-                ],
+                "actions": actions,
             }
         )
 

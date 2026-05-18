@@ -170,43 +170,61 @@ class DailyReportBuilder:
 
 
 class WeeklyReportBuilder:
-    """周报构建器"""
+    """周报构建器 - 支持本周/上周切换"""
 
-    def build(self, week_start: Optional[str] = None) -> dict:
-        """构建周报数据（默认上周）"""
+    def build(self, week_type: str = "last", week_start: Optional[str] = None) -> dict:
+        """
+        构建周报数据
+
+        Args:
+            week_type: "current" 本周 | "last" 上周（默认）
+            week_start: 指定周开始日期（YYYY-MM-DD），优先级高于 week_type
+
+        Returns:
+            包含完整周报数据的字典，所有字段均带中文注释
+        """
         today = datetime.now()
 
-        if week_start is None:
-            # 上周一（不是本周一）
-            last_monday = today - timedelta(days=today.weekday() + 7)
-            week_start = last_monday.strftime("%Y-%m-%d")
+        # 确定目标周的起止日期
+        if week_start:
+            # 使用指定日期
+            target_monday = datetime.strptime(week_start, "%Y-%m-%d")
+            # 确保是周一
+            target_monday = target_monday - timedelta(days=target_monday.weekday())
+        elif week_type == "current":
+            # 本周一（到今天）
+            target_monday = today - timedelta(days=today.weekday())
+        else:
+            # 上周一（默认）
+            target_monday = today - timedelta(days=today.weekday() + 7)
 
-        week_end = (
-            datetime.strptime(week_start, "%Y-%m-%d") + timedelta(days=6)
-        ).strftime("%Y-%m-%d")
-        last_week_start = (
-            datetime.strptime(week_start, "%Y-%m-%d") - timedelta(days=7)
-        ).strftime("%Y-%m-%d")
-        last_week_end = week_start
+        # 目标周：周一到周日
+        target_week_start = target_monday.strftime("%Y-%m-%d")
+        target_week_end = (target_monday + timedelta(days=6)).strftime("%Y-%m-%d")
 
-        # 上周数据（主数据）
-        week_metrics = get_metrics_range(week_start, week_end)
-        week_data = self._sum_metrics(week_metrics)
+        # 对比周（前一周）：用于环比计算
+        compare_monday = target_monday - timedelta(days=7)
+        compare_week_start = compare_monday.strftime("%Y-%m-%d")
+        compare_week_end = target_week_start  # 对比周结束于目标周开始前一天
 
-        # 上上周数据（用于环比）
-        last_week_metrics = get_metrics_range(last_week_start, last_week_end)
-        last_week_data = self._sum_metrics(last_week_metrics)
+        # 目标周数据
+        target_metrics = get_metrics_range(target_week_start, target_week_end)
+        target_data = self._sum_metrics(target_metrics)
 
-        # 计算环比
+        # 对比周数据（用于环比）
+        compare_metrics = get_metrics_range(compare_week_start, compare_week_end)
+        compare_data = self._sum_metrics(compare_metrics)
+
+        # 计算环比（目标周 vs 对比周）
         week_over_week = {
-            "views": _calc_trend(week_data["views"], last_week_data["views"]),
+            "views": _calc_trend(target_data["views"], compare_data["views"]),
             "downloads": _calc_trend(
-                week_data["downloads"], last_week_data["downloads"]
+                target_data["downloads"], compare_data["downloads"]
             ),
             "publishes": _calc_trend(
-                week_data["publishes"], last_week_data["publishes"]
+                target_data["publishes"], compare_data["publishes"]
             ),
-            "searches": _calc_trend(week_data["searches"], last_week_data["searches"]),
+            "searches": _calc_trend(target_data["searches"], compare_data["searches"]),
         }
 
         # 部门统计（综合评分：发布量*0.3 + 下载量*0.7）
@@ -284,55 +302,133 @@ class WeeklyReportBuilder:
         total_publishes = len([s for s in all_skills if s.get("status") == "approved"])
 
         # 计算数据质量指标
-        data_quality = self._calc_data_quality(week_data)
+        data_quality = self._calc_data_quality(target_data)
 
+        # 构建返回数据，所有字段带中文注释说明
         return {
-            "week_range": f"{week_start} ~ {week_end}",
+            # ========== 基础信息 ==========
+            "week_type": week_type,  # 周类型：current 本周 | last 上周
+            "week_range": f"{target_week_start} ~ {target_week_end}",  # 统计周期范围（YYYY-MM-DD ~ YYYY-MM-DD）
+            "compare_week_range": f"{compare_week_start} ~ {compare_week_end}",  # 对比周期范围（用于环比计算）
+            "generated_at": datetime.now().isoformat(),  # 报告生成时间（ISO 8601格式）
+            # ========== 平台累计数据（截至报告生成时） ==========
             "summary": {
-                "total_skills": total_skills,
-                "total_views": total_views,
-                "total_downloads": total_downloads,
-                "total_publishes": total_publishes,
+                "total_skills": total_skills,  # 技能总量：平台上所有Skill的总数（含待审核、已拒绝）
+                "total_views": total_views,  # 总访问量：所有Skill被浏览的总次数（累计值）
+                "total_downloads": total_downloads,  # 总下载量：所有Skill被下载的总次数（累计值）
+                "total_publishes": total_publishes,  # 总发布量：状态为"已审核通过(approved)"的Skill数量
             },
-            "this_week": week_data,
-            "last_week": last_week_data,
-            "week_over_week": week_over_week,
-            "top_departments": top_departments[:5],
-            "top_skills": top_skills[:5],
-            "data_quality": data_quality,
+            # ========== 目标周核心指标 ==========
+            "this_week": {
+                "skills_total": target_data[
+                    "skills_total"
+                ],  # 本周新增Skill数：目标周期内新发布的Skill数量
+                "downloads": target_data[
+                    "downloads"
+                ],  # 本周下载次数：目标周期内所有下载事件的总次数
+                "views": target_data[
+                    "views"
+                ],  # 本周浏览次数：目标周期内所有浏览事件的总次数
+                "publishes": target_data[
+                    "publishes"
+                ],  # 本周发布次数：目标周期内审核通过的Skill数量
+                "searches": target_data[
+                    "searches"
+                ],  # 本周搜索次数：目标周期内用户搜索的总次数
+                "unique_users": target_data[
+                    "unique_users"
+                ],  # 本周活跃用户数：目标周期内产生过操作（浏览/下载/搜索/发布）的去重用户数
+            },
+            # ========== 对比周核心指标（用于环比计算） ==========
+            "last_week": {
+                "skills_total": compare_data["skills_total"],  # 对比周新增Skill数
+                "downloads": compare_data["downloads"],  # 对比周下载次数
+                "views": compare_data["views"],  # 对比周浏览次数
+                "publishes": compare_data["publishes"],  # 对比周发布次数
+                "searches": compare_data["searches"],  # 对比周搜索次数
+                "unique_users": compare_data["unique_users"],  # 对比周活跃用户数
+            },
+            # ========== 环比趋势（目标周 vs 对比周） ==========
+            "week_over_week": {
+                "views": week_over_week[
+                    "views"
+                ],  # 浏览量环比：{value: 差值, arrow: 箭头, pct: 百分比, is_up: 是否上涨}
+                "downloads": week_over_week["downloads"],  # 下载量环比
+                "publishes": week_over_week["publishes"],  # 发布量环比
+                "searches": week_over_week["searches"],  # 搜索量环比
+            },
+            # ========== 部门排行榜（Top 5） ==========
+            "top_departments": top_departments[
+                :5
+            ],  # 部门排行：按综合评分排序，包含部门名、发布数、下载数、浏览数、综合评分
+            # ========== 个人排行榜（Top 5） ==========
+            "top_skills": top_skills[
+                :5
+            ],  # 个人排行：按综合评分排序，包含姓名、发布数、下载数、浏览数、部门、综合评分
+            # ========== 数据质量指标 ==========
+            "data_quality": {
+                "view_dedup_rate": data_quality[
+                    "view_dedup_rate"
+                ],  # 浏览去重率：有效浏览（去重IP）/ 总浏览量 * 100%
+                "download_conversion": data_quality[
+                    "download_conversion"
+                ],  # 下载转化率：下载量 / 浏览量 * 100%
+                "search_valid_rate": data_quality[
+                    "search_valid_rate"
+                ],  # 搜索有效率：有结果搜索 / 总搜索 * 100%
+                "total_views": data_quality["total_views"],  # 总浏览量（原始值）
+                "unique_views": data_quality["unique_views"],  # 去重后浏览量
+                "valid_searches": data_quality[
+                    "valid_searches"
+                ],  # 有效搜索次数（有结果）
+            },
+            # ========== 指标统计标准说明 ==========
             "metric_standards": {
                 "views": {
-                    "standard": "去重IP/日",
-                    "formula": "count(distinct ip, date)",
+                    "standard": "去重IP/日",  # 统计标准：每个IP每天只计1次浏览
+                    "formula": "count(distinct ip, date)",  # 计算公式
+                    "description": "每个IP每天只计1次浏览，避免重复刷新",  # 详细说明
                 },
                 "downloads": {
-                    "standard": "每次下载计1次",
-                    "formula": "count(download_event)",
+                    "standard": "每次下载计1次",  # 统计标准：每次点击下载按钮即计1次
+                    "formula": "count(download_event)",  # 计算公式
+                    "description": "每次点击下载按钮即计1次，不限制同一用户",  # 详细说明
                 },
                 "publishes": {
-                    "standard": "审核通过技能",
-                    "formula": "count(status='approved')",
+                    "standard": "审核通过技能",  # 统计标准：仅统计状态为approved的Skill
+                    "formula": "count(status='approved')",  # 计算公式
+                    "description": "状态为approved的技能数量，不包括待审核和拒绝的",  # 详细说明
                 },
                 "searches": {
-                    "standard": "每次搜索计1次",
-                    "formula": "count(search_event)",
+                    "standard": "每次搜索计1次",  # 统计标准：每次搜索请求计1次
+                    "formula": "count(search_event)",  # 计算公式
+                    "description": "每次搜索请求计1次，包括有结果和无结果",  # 详细说明
                 },
                 "users": {
-                    "standard": "有操作行为用户",
-                    "formula": "count(distinct user)",
+                    "standard": "有操作行为用户",  # 统计标准：至少产生1次事件的用户
+                    "formula": "count(distinct user)",  # 计算公式
+                    "description": "至少产生1次事件（浏览/下载/搜索/发布）的独立用户",  # 详细说明
                 },
             },
         }
 
     def _sum_metrics(self, metrics: list) -> dict:
-        """汇总指标"""
+        """
+        汇总多日的指标数据
+
+        Args:
+            metrics: 每日指标数据列表
+
+        Returns:
+            汇总后的指标字典
+        """
         total = {
-            "skills_total": 0,
-            "downloads": 0,
-            "views": 0,
-            "publishes": 0,
-            "searches": 0,
-            "unique_users": 0,
+            "skills_total": 0,  # 累计新增Skill数
+            "downloads": 0,  # 累计下载次数
+            "views": 0,  # 累计浏览次数
+            "publishes": 0,  # 累计发布次数
+            "searches": 0,  # 累计搜索次数
+            "unique_users": 0,  # 最大活跃用户数（取每日最大值，避免重复累加）
         }
         for m in metrics:
             total["skills_total"] += m.get("skills", {}).get("total_publishes", 0)
@@ -346,7 +442,15 @@ class WeeklyReportBuilder:
         return total
 
     def _calc_data_quality(self, week_data: dict) -> dict:
-        """计算数据质量指标"""
+        """
+        计算数据质量指标
+
+        Args:
+            week_data: 周汇总数据
+
+        Returns:
+            数据质量指标字典
+        """
         # 浏览去重率（有效浏览/总浏览）- 简化计算，假设有效浏览为80%
         total_views = week_data.get("views", 0)
         unique_views = int(total_views * 0.8) if total_views else 0
@@ -367,10 +471,10 @@ class WeeklyReportBuilder:
         return {
             "view_dedup_rate": (
                 round(unique_views / total_views * 100, 1) if total_views else 0
-            ),
-            "download_conversion": download_conversion,
-            "search_valid_rate": search_valid_rate,
-            "total_views": total_views,
-            "unique_views": unique_views,
-            "valid_searches": valid_searches,
+            ),  # 浏览去重率：有效浏览占比
+            "download_conversion": download_conversion,  # 下载转化率：浏览到下载的转化比例
+            "search_valid_rate": search_valid_rate,  # 搜索有效率：有结果搜索占比
+            "total_views": total_views,  # 总浏览量
+            "unique_views": unique_views,  # 去重后浏览量
+            "valid_searches": valid_searches,  # 有效搜索次数
         }

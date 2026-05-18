@@ -11,10 +11,11 @@ import shutil
 import uuid
 import json
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import Counter
 
 from app.config import STORAGE_DIR, MAX_FILE_SIZE, QUICK_APPROVE_TOKEN
+from app.timezone_utils import get_beijing_time, get_beijing_date, get_beijing_datetime
 from app.database import (
     skills_db,
     versions_db,
@@ -56,7 +57,7 @@ from app.events import (
 )
 from app.webhook_logs import WebhookLog, WebhookLogService
 from app.notifier import FeishuNotifier
-from app.report_builder import DailyReportBuilder, WeeklyReportBuilder
+from app.report_builder import DailyReportBuilder, WeeklyReportBuilder, _calc_trend
 from app.metrics import (
     get_kpi_summary,
     get_trend_data,
@@ -111,10 +112,10 @@ def _ensure_staff_initialized():
                     person = enrich_staff_record(person)
                     person["status"] = person.get("status", "active")
                     person["created_at"] = person.get(
-                        "created_at", datetime.now().isoformat()
+                        "created_at", get_beijing_datetime()
                     )
                     person["updated_at"] = person.get(
-                        "updated_at", datetime.now().isoformat()
+                        "updated_at", get_beijing_datetime()
                     )
                     enriched_staff.append(person)
                 staff_db.write({"staff": enriched_staff})
@@ -160,7 +161,7 @@ def _upsert_staff(name: str, employee_id: str, department: str, organization: st
                 existing.update(enrich_staff_record({"department": department}))
             if organization:
                 existing["organization"] = organization
-            existing["updated_at"] = datetime.now().isoformat()
+            existing["updated_at"] = get_beijing_datetime()
         else:
             # 创建新记录（自动补充 IDC 字段）
             new_staff = {
@@ -170,8 +171,8 @@ def _upsert_staff(name: str, employee_id: str, department: str, organization: st
                 "department": department or "",
                 "organization": organization or "",
                 "status": "active",
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat(),
+                "created_at": get_beijing_datetime(),
+                "updated_at": get_beijing_datetime(),
             }
             # 补充 IDC 标准字段
             new_staff.update(enrich_staff_record({"department": department}))
@@ -194,8 +195,19 @@ def add_audit_log(
     user: str,
     detail: str,
     request: Request = None,
+    extra: dict = None,
 ):
-    """添加审计日志"""
+    """添加审计日志
+
+    Args:
+        type_: 日志类型
+        skill_slug: 技能slug
+        skill_name: 技能名称
+        user: 操作用户
+        detail: 详情描述
+        request: HTTP请求对象（用于获取IP）
+        extra: 额外字段（如开发者、部门、描述等）
+    """
     ip = get_client_ip(request) if request else ""
     log = {
         "id": str(uuid.uuid4()),
@@ -204,14 +216,18 @@ def add_audit_log(
         "skill_name": skill_name,
         "ip": ip,
         "user": user,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": get_beijing_datetime(),
         "detail": detail,
     }
+
+    # 合并额外字段
+    if extra and isinstance(extra, dict):
+        log.update(extra)
 
     def append_log(data):
         data["logs"].append(log)
         # 清理30天前的日志
-        cutoff = (datetime.now() - timedelta(days=30)).isoformat()
+        cutoff = (get_beijing_time() - timedelta(days=30)).isoformat()
         data["logs"] = [l for l in data["logs"] if l["timestamp"] >= cutoff]
 
     audit_logs_db.update(append_log)
@@ -399,7 +415,7 @@ async def create_skill(
         latest_link.symlink_to(version, target_is_directory=True)
 
         # 创建记录
-        now = datetime.now().isoformat()
+        now = get_beijing_datetime()
         # 解析 tags
         skill_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
 
@@ -467,10 +483,14 @@ async def create_skill(
             file_size=final_path.stat().st_size,
         )
 
-        # 发送发布申请通知（给管理员）
+        # 发送发布申请通知（给管理员）- 同时发送到内部和外部通道
         try:
-            notifier = FeishuNotifier()
-            notifier.send_publish_apply(skill_record)
+            # 内部通道
+            notifier_internal = FeishuNotifier(channel="internal")
+            notifier_internal.send_publish_apply(skill_record)
+            # 外部通道
+            notifier_external = FeishuNotifier(channel="external")
+            notifier_external.send_publish_apply(skill_record)
         except Exception:
             pass
 
@@ -532,7 +552,7 @@ def download_skill(slug: str, version: str = Query(None), request: Request = Non
         for s in data.get("skills", []):
             if s["id"] == skill["id"]:
                 s["download_count"] = s.get("download_count", 0) + 1
-                s["updated_at"] = datetime.now().isoformat()
+                s["updated_at"] = get_beijing_datetime()
                 break
 
     skills_db.update(increment_download)
@@ -589,7 +609,7 @@ async def create_version(
         shutil.move(str(temp_path), str(final_path))
 
         # 创建新版本记录（is_latest = False，待审核）
-        now = datetime.now().isoformat()
+        now = get_beijing_datetime()
         version_record = {
             "id": f"{skill['id']}-{version}",
             "skill_id": skill["id"],
@@ -664,7 +684,7 @@ async def update_skill(
         raise HTTPException(status_code=404, detail="Skill not found")
 
     skill_tags = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
-    now = datetime.now().isoformat()
+    now = get_beijing_datetime()
 
     def update_data(data):
         for s in data.get("skills", []):
@@ -699,7 +719,7 @@ def delete_skill_endpoint(slug: str, request: Request = None):
         raise HTTPException(status_code=404, detail="Skill not found")
 
     # 将技能状态改为 delete_pending（删除待审核）
-    now = datetime.now().isoformat()
+    now = get_beijing_datetime()
 
     def mark_delete_pending(data):
         for s in data.get("skills", []):
@@ -817,7 +837,7 @@ def export_skills(password: str = Form(...)):
 def record_view(slug: str, request: Request):
     """记录技能浏览量，每个IP每天只计一次"""
     ip = get_client_ip(request)
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = get_beijing_date()
 
     # 读取IP记录
     vr_data = view_records_db.read()
@@ -835,7 +855,7 @@ def record_view(slug: str, request: Request):
     records[today] = today_records
 
     # 清理7天前记录
-    cutoff = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    cutoff = (get_beijing_time() - timedelta(days=7)).strftime("%Y-%m-%d")
     for old_date in list(records.keys()):
         if old_date < cutoff:
             del records[old_date]
@@ -975,7 +995,7 @@ def get_kpi():
     """获取KPI汇总卡片数据（今日/昨日/本周/本月）"""
     try:
         # 确保今日数据已聚合
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = get_beijing_date()
         if not get_daily_metrics(today):
             aggregate_daily(today)
 
@@ -1000,7 +1020,7 @@ def get_trend(
         if start and end:
             trend = get_trend_data(start, end)
         else:
-            end_date = datetime.now()
+            end_date = get_beijing_time()
             start_date = end_date - timedelta(days=days)
             trend = get_trend_data(
                 start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
@@ -1053,7 +1073,7 @@ def get_realtime(limit: int = Query(20, ge=1, le=100)):
 @app.get("/api/stats/search-analysis")
 def get_search_analysis(days: int = Query(7, ge=1, le=30)):
     """获取搜索分析数据"""
-    end_date = datetime.now()
+    end_date = get_beijing_time()
     start_date = end_date - timedelta(days=days)
 
     events = get_events_range(
@@ -1169,7 +1189,7 @@ def approve_skill(
     if not skill:
         raise HTTPException(status_code=404, detail="Skill not found")
 
-    now = datetime.now().isoformat()
+    now = get_beijing_datetime()
 
     if action == "approve":
         # 查找该技能待审核的最新版本
@@ -1210,19 +1230,27 @@ def approve_skill(
                 latest_link.unlink()
             latest_link.symlink_to(pending_ver["version"], target_is_directory=True)
 
-        # 记录日志
+        # 记录日志（包含完整信息）
         add_audit_log(
             "approve",
             slug,
             skill["name"],
             "管理员",
-            f"审核通过" + (f"，版本 {pending_ver['version']}" if pending_ver else ""),
+            "审核通过",
+            extra={
+                "developer": skill.get("author_name", ""),
+                "department": skill.get("author_department", ""),
+                "description": skill.get("description", "")[:100],
+                "version": pending_ver["version"] if pending_ver else None,
+            },
         )
 
-        # 发送审批通过通知（给提交人）
+        # 发送审批通过通知（给提交人）- 同时发送到内部和外部通道
         try:
-            notifier = FeishuNotifier()
-            notifier.send_publish_approve(skill, "管理员")
+            notifier_internal = FeishuNotifier(channel="internal")
+            notifier_internal.send_publish_approve(skill, "管理员")
+            notifier_external = FeishuNotifier(channel="external")
+            notifier_external.send_publish_approve(skill, "管理员")
         except Exception:
             pass
 
@@ -1242,10 +1270,12 @@ def approve_skill(
         # 记录日志
         add_audit_log("reject", slug, skill["name"], "管理员", f"审核拒绝: {reason}")
 
-        # 发送审批拒绝通知（给提交人）
+        # 发送审批拒绝通知（给提交人）- 同时发送到内部和外部通道
         try:
-            notifier = FeishuNotifier()
-            notifier.send_publish_reject(skill, reason, "管理员")
+            notifier_internal = FeishuNotifier(channel="internal")
+            notifier_internal.send_publish_reject(skill, reason, "管理员")
+            notifier_external = FeishuNotifier(channel="external")
+            notifier_external.send_publish_reject(skill, reason, "管理员")
         except Exception:
             pass
 
@@ -1408,7 +1438,7 @@ def trigger_scheduler_job(job_id: str = Form(...)):
     if job is None:
         return {"success": False, "message": f"Job {job_id} not found"}
 
-    job.modify(next_run_time=datetime.now())
+    job.modify(next_run_time=get_beijing_time())
     return {"success": True, "message": f"Job {job_id} triggered"}
 
 
@@ -1466,25 +1496,35 @@ def get_webhook_logs_stats(request: Request):
 
 
 @app.post("/api/admin/webhook-logs/test")
-def test_webhook(request: Request):
-    """手动测试 Webhook 发送"""
+def test_webhook(
+    request: Request,
+    channel: str = Query("internal", description="通道: internal 内部 | external 外部"),
+):
+    """手动测试 Webhook 发送 - 支持双通道"""
     verify_admin_token(request)
-    notifier = FeishuNotifier()
-    log = notifier.send_text("🧪 测试消息", "manual_test")
+    notifier = FeishuNotifier(channel=channel)
+    log = notifier.send_text(f"🧪 测试消息 ({channel}通道)", "manual_test")
     return {"success": log.status == "success", "data": log.to_dict()}
 
 
 @app.post("/api/admin/webhook-logs/{id}/retry")
-def retry_webhook_log(id: str, request: Request):
-    """重试发送失败的 Webhook"""
+def retry_webhook_log(
+    id: str,
+    request: Request,
+    channel: str = Query(
+        None, description="指定通道: internal | external，不指定则使用原通道"
+    ),
+):
+    """重试发送 Webhook（支持选择通道）"""
     verify_admin_token(request)
     log = WebhookLogService.get_detail(id)
     if not log:
         raise HTTPException(status_code=404, detail="日志不存在")
-    if log["status"] != "failed":
-        return {"success": False, "message": "只有失败的日志可以重试"}
-    # 重试：使用原始日志的请求体重新发送
-    notifier = FeishuNotifier()
+
+    # 确定目标通道
+    target_channel = channel or log.get("channel", "internal")
+    notifier = FeishuNotifier(channel=target_channel)
+
     try:
         # 重新构建消息
         message = log.get("request_body", {})
@@ -1493,14 +1533,22 @@ def retry_webhook_log(id: str, request: Request):
             new_log = notifier._send(message, log.get("type", "retry"))
             return {
                 "success": new_log.status == "success",
-                "data": {"original_id": id, "new_log": new_log.to_dict()},
+                "data": {
+                    "original_id": id,
+                    "new_log": new_log.to_dict(),
+                    "channel": target_channel,
+                },
             }
         else:
             # 如果没有请求体，发送简单文本
             new_log = notifier.send_text("🧪 重试发送（原始请求体丢失）", "retry")
             return {
                 "success": new_log.status == "success",
-                "data": {"original_id": id, "new_log": new_log.to_dict()},
+                "data": {
+                    "original_id": id,
+                    "new_log": new_log.to_dict(),
+                    "channel": target_channel,
+                },
             }
     except Exception as e:
         return {"success": False, "message": f"重试失败: {str(e)}"}
@@ -1509,7 +1557,7 @@ def retry_webhook_log(id: str, request: Request):
 # 手动发送日报
 @app.post("/api/admin/send-daily-report")
 def send_daily_report_manual(request: Request):
-    """手动发送日报"""
+    """手动发送日报 - 只发送到内部通道"""
     verify_admin_token(request)
     try:
         from app.report_builder import DailyReportBuilder
@@ -1518,8 +1566,9 @@ def send_daily_report_manual(request: Request):
         builder = DailyReportBuilder()
         report_data = builder.build()
 
-        notifier = FeishuNotifier()
-        log = notifier.send_daily_report(report_data)
+        # 内部通道
+        notifier_internal = FeishuNotifier(channel="internal")
+        log_internal = notifier_internal.send_daily_report(report_data)
 
         # 记录到新的日志库
         expert_db.log_user_activity(
@@ -1529,11 +1578,14 @@ def send_daily_report_manual(request: Request):
                 "report_type": "daily",
                 "date": report_data.get("date"),
                 "summary": report_data.get("summary", {}),
-                "send_status": log.status,
+                "send_status": log_internal.status,
             },
         )
 
-        return {"success": log.status == "success", "data": log.to_dict()}
+        return {
+            "success": log_internal.status == "success",
+            "data": log_internal.to_dict(),
+        }
     except Exception as e:
         return {"success": False, "message": f"发送失败: {str(e)}"}
 
@@ -1541,7 +1593,7 @@ def send_daily_report_manual(request: Request):
 # 手动发送周报
 @app.post("/api/admin/send-weekly-report")
 def send_weekly_report_manual(request: Request):
-    """手动发送周报"""
+    """手动发送周报 - 同时发送到内部和外部通道"""
     verify_admin_token(request)
     try:
         from app.report_builder import WeeklyReportBuilder
@@ -1550,8 +1602,13 @@ def send_weekly_report_manual(request: Request):
         builder = WeeklyReportBuilder()
         report_data = builder.build()
 
-        notifier = FeishuNotifier()
-        log = notifier.send_weekly_report(report_data)
+        # 内部通道
+        notifier_internal = FeishuNotifier(channel="internal")
+        log_internal = notifier_internal.send_weekly_report(report_data)
+
+        # 外部通道
+        notifier_external = FeishuNotifier(channel="external")
+        log_external = notifier_external.send_weekly_report(report_data)
 
         # 记录到新的日志库
         expert_db.log_user_activity(
@@ -1561,11 +1618,19 @@ def send_weekly_report_manual(request: Request):
                 "report_type": "weekly",
                 "week_range": report_data.get("week_range"),
                 "summary": report_data.get("summary", {}),
-                "send_status": log.status,
+                "internal_status": log_internal.status,
+                "external_status": log_external.status,
             },
         )
 
-        return {"success": log.status == "success", "data": log.to_dict()}
+        return {
+            "success": log_internal.status == "success"
+            and log_external.status == "success",
+            "data": {
+                "internal": log_internal.to_dict(),
+                "external": log_external.to_dict(),
+            },
+        }
     except Exception as e:
         return {"success": False, "message": f"发送失败: {str(e)}"}
 
@@ -1611,13 +1676,106 @@ def get_daily_report(request: Request):
 
 @app.get("/api/reports/weekly")
 def get_weekly_report(request: Request):
-    """获取实时周报内容（需要 Bearer Token 鉴权）"""
+    """
+    获取周报内容（需要 Bearer Token 鉴权）
+    同时返回本周和上周的数据，无需传参
+
+    返回字段说明:
+    - current_week: 本周数据（周一到今天）
+    - last_week: 上周数据（周一到周日）
+    - week_over_week: 本周 vs 上周环比趋势
+    - summary: 平台累计数据（技能总量/总访问量/总下载量/总发布量）
+    - top_departments: 部门排行榜Top5
+    - top_skills: 个人排行榜Top5
+    - data_quality: 数据质量指标（去重率/转化率/有效率）
+    - metric_standards: 指标统计标准说明
+    """
     verify_report_token(request)
     try:
         from app.report_builder import WeeklyReportBuilder
 
         builder = WeeklyReportBuilder()
-        report_data = builder.build()
+
+        # 同时生成本周和上周数据
+        current_week_data = builder.build(week_type="current")
+        last_week_data = builder.build(week_type="last")
+
+        # 计算环比（本周 vs 上周）
+        week_over_week = {
+            "views": _calc_trend(
+                current_week_data["this_week"]["views"],
+                last_week_data["this_week"]["views"],
+            ),
+            "downloads": _calc_trend(
+                current_week_data["this_week"]["downloads"],
+                last_week_data["this_week"]["downloads"],
+            ),
+            "publishes": _calc_trend(
+                current_week_data["this_week"]["publishes"],
+                last_week_data["this_week"]["publishes"],
+            ),
+            "searches": _calc_trend(
+                current_week_data["this_week"]["searches"],
+                last_week_data["this_week"]["searches"],
+            ),
+        }
+
+        # 合并数据
+        report_data = {
+            # 本周数据
+            "current_week": {
+                "week_range": current_week_data["week_range"],  # 本周统计周期范围
+                "skills_total": current_week_data["this_week"][
+                    "skills_total"
+                ],  # 本周新增Skill数
+                "downloads": current_week_data["this_week"][
+                    "downloads"
+                ],  # 本周下载次数
+                "views": current_week_data["this_week"]["views"],  # 本周浏览次数
+                "publishes": current_week_data["this_week"][
+                    "publishes"
+                ],  # 本周发布次数
+                "searches": current_week_data["this_week"]["searches"],  # 本周搜索次数
+                "unique_users": current_week_data["this_week"][
+                    "unique_users"
+                ],  # 本周活跃用户数
+            },
+            # 上周数据
+            "last_week": {
+                "week_range": last_week_data["week_range"],  # 上周统计周期范围
+                "skills_total": last_week_data["this_week"][
+                    "skills_total"
+                ],  # 上周新增Skill数
+                "downloads": last_week_data["this_week"]["downloads"],  # 上周下载次数
+                "views": last_week_data["this_week"]["views"],  # 上周浏览次数
+                "publishes": last_week_data["this_week"]["publishes"],  # 上周发布次数
+                "searches": last_week_data["this_week"]["searches"],  # 上周搜索次数
+                "unique_users": last_week_data["this_week"][
+                    "unique_users"
+                ],  # 上周活跃用户数
+            },
+            # 环比趋势
+            "week_over_week": week_over_week,  # 本周 vs 上周环比趋势
+            # 平台累计数据
+            "summary": current_week_data[
+                "summary"
+            ],  # 平台累计数据（技能总量/总访问量/总下载量/总发布量）
+            # 排行榜（使用本周数据）
+            "top_departments": current_week_data["top_departments"],  # 部门排行榜Top5
+            "top_skills": current_week_data["top_skills"],  # 个人排行榜Top5
+            # 数据质量
+            "data_quality": current_week_data[
+                "data_quality"
+            ],  # 数据质量指标（去重率/转化率/有效率）
+            # 指标标准
+            "metric_standards": current_week_data[
+                "metric_standards"
+            ],  # 指标统计标准说明
+            # 生成时间
+            "generated_at": current_week_data[
+                "generated_at"
+            ],  # 报告生成时间（ISO 8601格式）
+        }
 
         # 记录到新的日志库
         expert_db.log_user_activity(
@@ -1625,7 +1783,8 @@ def get_weekly_report(request: Request):
             user_id="system",
             details={
                 "report_type": "weekly",
-                "week_range": report_data.get("week_range"),
+                "current_week_range": current_week_data.get("week_range"),
+                "last_week_range": last_week_data.get("week_range"),
                 "summary": report_data.get("summary", {}),
             },
         )
@@ -1660,7 +1819,7 @@ def quick_approve(
     if not skill:
         raise HTTPException(status_code=404, detail="Skill not found")
 
-    now = datetime.now().isoformat()
+    now = get_beijing_datetime()
 
     if action == "approve":
         # 查找该技能待审核的最新版本
@@ -1701,20 +1860,27 @@ def quick_approve(
                 latest_link.unlink()
             latest_link.symlink_to(pending_ver["version"], target_is_directory=True)
 
-        # 记录日志
+        # 记录日志（包含完整信息）
         add_audit_log(
             "approve",
             slug,
             skill["name"],
             "管理员",
-            f"快速审核通过"
-            + (f"，版本 {pending_ver['version']}" if pending_ver else ""),
+            "快速审核通过",
+            extra={
+                "developer": skill.get("author_name", ""),
+                "department": skill.get("author_department", ""),
+                "description": skill.get("description", "")[:100],
+                "version": pending_ver["version"] if pending_ver else None,
+            },
         )
 
-        # 发送审批通过通知（给提交人）
+        # 发送审批通过通知（给提交人）- 同时发送到内部和外部通道
         try:
-            notifier = FeishuNotifier()
-            notifier.send_publish_approve(skill, "管理员")
+            notifier_internal = FeishuNotifier(channel="internal")
+            notifier_internal.send_publish_approve(skill, "管理员")
+            notifier_external = FeishuNotifier(channel="external")
+            notifier_external.send_publish_approve(skill, "管理员")
         except Exception:
             pass
 
@@ -1736,10 +1902,12 @@ def quick_approve(
             "reject", slug, skill["name"], "管理员", f"快速审核拒绝: {reason}"
         )
 
-        # 发送审批拒绝通知（给提交人）
+        # 发送审批拒绝通知（给提交人）- 同时发送到内部和外部通道
         try:
-            notifier = FeishuNotifier()
-            notifier.send_publish_reject(skill, reason, "管理员")
+            notifier_internal = FeishuNotifier(channel="internal")
+            notifier_internal.send_publish_reject(skill, reason, "管理员")
+            notifier_external = FeishuNotifier(channel="external")
+            notifier_external.send_publish_reject(skill, reason, "管理员")
         except Exception:
             pass
 
@@ -2003,7 +2171,7 @@ def apply_for_arena(
             "description": description,
             "status": "submitted",
             "reward": None,
-            "submitted_at": datetime.now().isoformat(),
+            "submitted_at": get_beijing_datetime(),
         }
     )
 
@@ -2067,7 +2235,7 @@ def approve_arena_application(
             "status": "approved",
             "reward": reward,
             "remarks": remarks,
-            "approved_at": datetime.now().isoformat(),
+            "approved_at": get_beijing_datetime(),
         },
     )
 
@@ -2103,7 +2271,7 @@ def reject_arena_application(
         {
             "status": "rejected",
             "remarks": reason,
-            "rejected_at": datetime.now().isoformat(),
+            "rejected_at": get_beijing_datetime(),
         },
     )
 
@@ -2191,8 +2359,8 @@ def get_skill_score_detail(
     from datetime import datetime
 
     update_days = (
-        datetime.now()
-        - datetime.fromisoformat(skill.get("updated_at", datetime.now().isoformat()))
+        get_beijing_time()
+        - datetime.fromisoformat(skill.get("updated_at", get_beijing_datetime()))
     ).days
 
     detail = {

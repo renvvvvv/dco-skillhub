@@ -322,6 +322,7 @@ export function getDownloadUrl(slug: string, version?: string): string {
 export interface WebhookLog {
   id: string;
   type: string;
+  channel: string;
   status: string;
   webhook_url: string;
   request_body: any;
@@ -368,8 +369,8 @@ export async function getWebhookStats(token: string): Promise<ApiResponse<any>> 
 }
 
 // 测试发送 Webhook
-export async function testWebhook(token: string): Promise<ApiResponse<WebhookLog>> {
-  const response = await fetch(`${API_BASE}/admin/webhook-logs/test`, {
+export async function testWebhook(token: string, channel: string = 'internal'): Promise<ApiResponse<WebhookLog>> {
+  const response = await fetch(`${API_BASE}/admin/webhook-logs/test?channel=${channel}`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` }
   });
@@ -378,8 +379,11 @@ export async function testWebhook(token: string): Promise<ApiResponse<WebhookLog
 }
 
 // 重试 Webhook
-export async function retryWebhook(token: string, id: string): Promise<ApiResponse<any>> {
-  const response = await fetch(`${API_BASE}/admin/webhook-logs/${id}/retry`, {
+export async function retryWebhook(token: string, id: string, channel?: string): Promise<ApiResponse<any>> {
+  const url = channel 
+    ? `${API_BASE}/admin/webhook-logs/${id}/retry?channel=${channel}`
+    : `${API_BASE}/admin/webhook-logs/${id}/retry`;
+  const response = await fetch(url, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` }
   });

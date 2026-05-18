@@ -42,7 +42,7 @@ export default function Navigation() {
           src="/logo.jpg" 
           alt="随航守卫" 
           style={{
-            height: 40,
+            height: 62,
             width: 'auto',
             objectFit: 'contain',
             borderRadius: 8,

@@ -30,12 +30,28 @@ SEARCH_LOGS_FILE = DATA_DIR / "search_logs.json"
 # Webhook 日志
 WEBHOOK_LOGS_FILE = DATA_DIR / "webhook_logs.json"
 
-# 飞书配置
+# 周报SVG模板配置
+WEEKLY_SVG_TEMPLATE_DIR = BASE_DIR / "app" / "templates" / "weekly_report"
+WEEKLY_SVG_OUTPUT_DIR = STORAGE_DIR / "weekly_svg"
+WEEKLY_SVG_TEMPLATE_FILE = WEEKLY_SVG_TEMPLATE_DIR / "template.svg"
+
+# 确保目录存在
+WEEKLY_SVG_TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
+WEEKLY_SVG_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# 飞书配置 - 内部通道（原通道）
 FEISHU_WEBHOOK_URL = os.getenv(
     "FEISHU_WEBHOOK_URL",
     "https://open.feishu.cn/open-apis/bot/v2/hook/27c9ad3d-cf09-48f9-af93-fdd599240d60",
 )
 FEISHU_WEBHOOK_SECRET = os.getenv("FEISHU_WEBHOOK_SECRET", "")
+
+# 飞书配置 - 外部通道（新通道，不发日报）
+FEISHU_WEBHOOK_URL_EXTERNAL = os.getenv(
+    "FEISHU_WEBHOOK_URL_EXTERNAL",
+    "https://open.feishu.cn/open-apis/bot/v2/hook/8ffc7c00-d5a8-432f-a28b-143f9a14637c",
+)
+FEISHU_WEBHOOK_SECRET_EXTERNAL = os.getenv("FEISHU_WEBHOOK_SECRET_EXTERNAL", "")
 
 # 通知开关
 ENABLE_DAILY_REPORT = os.getenv("ENABLE_DAILY_REPORT", "true").lower() == "true"

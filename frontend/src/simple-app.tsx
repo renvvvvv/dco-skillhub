@@ -504,7 +504,7 @@ function StatsView() {
     )
   }
 
-  const kpiData = kpi?.[timeRange] || kpi?.today
+  const kpiData = kpi?.[timeRange === 'week' ? 'this_week' : timeRange === 'month' ? 'this_month' : 'today'] || kpi?.today
   const downloadSorted = stats ? [...stats.skills].sort((a, b) => b.downloads - a.downloads).slice(0, 10) : []
   const devSorted = stats ? [...stats.developers].sort((a, b) => b.count - a.count).slice(0, 10) : []
 
@@ -560,11 +560,11 @@ function StatsView() {
 
       {/* KPI 卡片 */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <KpiCard title="技能发布" value={kpiData?.skills_total || 0} icon="📦" color="bg-emerald-500" />
-        <KpiCard title="下载次数" value={kpiData?.downloads || 0} icon="⬇" color="bg-pink-500" />
-        <KpiCard title="浏览次数" value={kpiData?.views || 0} icon="👁" color="bg-purple-500" />
-        <KpiCard title="搜索次数" value={kpiData?.searches || 0} icon="🔍" color="bg-blue-500" />
-        <KpiCard title="活跃用户" value={kpiData?.unique_users || 0} icon="👤" color="bg-orange-500" />
+        <KpiCard title="技能发布（总计）" value={kpiData?.skills_total || 0} icon="📦" color="bg-emerald-500" />
+        <KpiCard title="下载次数（总计）" value={kpiData?.downloads || 0} icon="⬇" color="bg-pink-500" />
+        <KpiCard title="浏览次数（总计）" value={kpiData?.views || 0} icon="👁" color="bg-purple-500" />
+        <KpiCard title="搜索次数（总计）" value={kpiData?.searches || 0} icon="🔍" color="bg-blue-500" />
+        <KpiCard title="活跃用户（总计）" value={kpiData?.unique_users || 0} icon="👤" color="bg-orange-500" />
       </div>
 
       {/* 趋势图 + 活动流 */}

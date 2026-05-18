@@ -239,35 +239,49 @@ if __name__ == "__main__":
 
 
 def _send_daily_report():
-    """发送日报"""
+    """发送日报 - 只发送到内部通道"""
     from app.notifier import FeishuNotifier
     from app.report_builder import DailyReportBuilder
 
     builder = DailyReportBuilder()
     report_data = builder.build()
 
-    notifier = FeishuNotifier()
+    # 内部通道
+    notifier = FeishuNotifier(channel="internal")
     log = notifier.send_daily_report(report_data)
+    print(
+        f"[scheduler] Daily report sent to internal: {log.status} ({log.duration_ms}ms)"
+    )
 
-    print(f"[scheduler] Daily report sent: {log.status} ({log.duration_ms}ms)")
+    # 外部通道不发日报
+    print("[scheduler] Daily report skipped for external channel")
 
 
 def _send_weekly_report():
-    """发送周报"""
+    """发送周报 - 同时发送到内部和外部通道"""
     from app.notifier import FeishuNotifier
     from app.report_builder import WeeklyReportBuilder
 
     builder = WeeklyReportBuilder()
     report_data = builder.build()
 
-    notifier = FeishuNotifier()
-    log = notifier.send_weekly_report(report_data)
+    # 内部通道
+    notifier_internal = FeishuNotifier(channel="internal")
+    log_internal = notifier_internal.send_weekly_report(report_data)
+    print(
+        f"[scheduler] Weekly report sent to internal: {log_internal.status} ({log_internal.duration_ms}ms)"
+    )
 
-    print(f"[scheduler] Weekly report sent: {log.status} ({log.duration_ms}ms)")
+    # 外部通道
+    notifier_external = FeishuNotifier(channel="external")
+    log_external = notifier_external.send_weekly_report(report_data)
+    print(
+        f"[scheduler] Weekly report sent to external: {log_external.status} ({log_external.duration_ms}ms)"
+    )
 
 
 def _check_pending_alerts():
-    """检查待审核告警"""
+    """检查待审核告警 - 同时发送到内部和外部通道"""
     from app.notifier import FeishuNotifier
     from app.database import skills_db
     from app.config import PENDING_ALERT_THRESHOLD
@@ -276,12 +290,22 @@ def _check_pending_alerts():
     pending = [s for s in data.get("skills", []) if s.get("status") == "pending"]
 
     if len(pending) >= PENDING_ALERT_THRESHOLD:
-        notifier = FeishuNotifier()
-        log = notifier.send_alert(
-            {
-                "type": "pending_overflow",
-                "count": len(pending),
-                "skills": [s["name"] for s in pending[:5]],
-            }
+        alert_data = {
+            "type": "pending_overflow",
+            "count": len(pending),
+            "skills": [s["name"] for s in pending[:5]],
+        }
+
+        # 内部通道
+        notifier_internal = FeishuNotifier(channel="internal")
+        log_internal = notifier_internal.send_alert(alert_data)
+        print(
+            f"[scheduler] Pending alert sent to internal: {log_internal.status} ({len(pending)} pending)"
         )
-        print(f"[scheduler] Pending alert sent: {log.status} ({len(pending)} pending)")
+
+        # 外部通道
+        notifier_external = FeishuNotifier(channel="external")
+        log_external = notifier_external.send_alert(alert_data)
+        print(
+            f"[scheduler] Pending alert sent to external: {log_external.status} ({len(pending)} pending)"
+        )

@@ -19,16 +19,28 @@ const LOG_TYPE_COLORS: Record<string, string> = {
   'retry': 'bg-orange-100 text-orange-700',
 }
 
+const CHANNEL_LABELS: Record<string, string> = {
+  'internal': '内部通道',
+  'external': '外部通道',
+}
+
+const CHANNEL_COLORS: Record<string, string> = {
+  'internal': 'bg-blue-100 text-blue-700',
+  'external': 'bg-green-100 text-green-700',
+}
+
 interface WebhookLogViewProps {
   token: string
 }
 
 export function WebhookLogView({ token }: WebhookLogViewProps) {
+  const [activeTab, setActiveTab] = useState<'internal' | 'external' | 'logs'>('internal')
   const [logs, setLogs] = useState<WebhookLog[]>([])
   const [stats, setStats] = useState<any>(null)
   const [selectedLog, setSelectedLog] = useState<WebhookLog | null>(null)
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [filterChannel, setFilterChannel] = useState('')
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
@@ -62,16 +74,16 @@ export function WebhookLogView({ token }: WebhookLogViewProps) {
     }
   }
 
-  async function handleTest() {
+  async function handleTest(channel: string) {
     try {
-      setMessage('发送测试中...')
-      const result = await testWebhook(token)
+      setMessage(`发送${CHANNEL_LABELS[channel]}测试中...`)
+      const result = await testWebhook(token, channel)
       if (result.success) {
-        setMessage('✅ 测试发送成功')
+        setMessage(`✅ ${CHANNEL_LABELS[channel]}测试发送成功`)
         loadLogs()
         loadStats()
       } else {
-        setMessage('❌ 测试发送失败')
+        setMessage(`❌ ${CHANNEL_LABELS[channel]}测试发送失败`)
       }
     } catch (err) {
       setMessage('❌ 测试失败: ' + (err as Error).message)
@@ -83,7 +95,7 @@ export function WebhookLogView({ token }: WebhookLogViewProps) {
       setMessage('发送日报中...')
       const result = await sendDailyReport(token)
       if (result.success) {
-        setMessage('✅ 日报发送成功')
+        setMessage('✅ 日报发送成功（仅内部通道）')
         loadLogs()
         loadStats()
       } else {
@@ -99,7 +111,7 @@ export function WebhookLogView({ token }: WebhookLogViewProps) {
       setMessage('发送周报中...')
       const result = await sendWeeklyReport(token)
       if (result.success) {
-        setMessage('✅ 周报发送成功')
+        setMessage('✅ 周报发送成功（双通道）')
         loadLogs()
         loadStats()
       } else {
@@ -110,12 +122,12 @@ export function WebhookLogView({ token }: WebhookLogViewProps) {
     }
   }
 
-  async function handleRetry(id: string) {
+  async function handleRetry(id: string, channel?: string) {
     try {
-      setMessage('重试中...')
-      const result = await retryWebhook(token, id)
+      setMessage(`重试中...${channel ? ` (${CHANNEL_LABELS[channel]}通道)` : ''}`)
+      const result = await retryWebhook(token, id, channel)
       if (result.success) {
-        setMessage('✅ 重试成功')
+        setMessage(`✅ 重试成功${channel ? ` (${CHANNEL_LABELS[channel]}通道)` : ''}`)
         loadLogs()
         loadStats()
       } else {
@@ -140,18 +152,18 @@ export function WebhookLogView({ token }: WebhookLogViewProps) {
     loadStats()
   }, [filterType, filterStatus])
 
+  // 根据当前页签过滤日志
+  const filteredLogs = activeTab === 'logs' 
+    ? logs 
+    : logs.filter(log => log.channel === activeTab)
+
   return (
     <div className="space-y-6">
       {/* 头部 */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Webhook 日志管理</h2>
-          <p className="text-sm text-gray-500 mt-1">查看飞书通知发送记录和详情</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleTest} variant="outline" className="text-sm">🧪 测试发送</Button>
-          <Button onClick={handleSendDaily} className="text-sm bg-blue-500 hover:bg-blue-600">📊 发送日报</Button>
-          <Button onClick={handleSendWeekly} className="text-sm bg-purple-500 hover:bg-purple-600">📈 发送周报</Button>
+          <h2 className="text-2xl font-bold text-gray-900">Webhook 通知管理</h2>
+          <p className="text-sm text-gray-500 mt-1">管理双通道飞书通知发送和日志</p>
         </div>
       </div>
 
@@ -161,162 +173,321 @@ export function WebhookLogView({ token }: WebhookLogViewProps) {
         </div>
       )}
 
-      {/* 统计卡片 */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* 页签切换 */}
+      <div className="flex bg-gray-100 rounded-lg p-1">
+        {([
+          { key: 'internal', label: '内部通道', desc: '原Webhook' },
+          { key: 'external', label: '外部通道', desc: '新Webhook' },
+          { key: 'logs', label: '发送日志', desc: '所有记录' },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === tab.key 
+                ? 'bg-white text-gray-900 shadow-sm' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <div className="flex flex-col items-center">
+              <span>{tab.label}</span>
+              <span className="text-xs opacity-70">{tab.desc}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* 内部通道内容 */}
+      {activeTab === 'internal' && (
+        <div className="space-y-6">
           <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-              <div className="text-xs text-gray-500">总发送次数</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.success}</div>
-              <div className="text-xs text-gray-500">成功</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
-              <div className="text-xs text-gray-500">失败</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.success_rate}%</div>
-              <div className="text-xs text-gray-500">成功率</div>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                内部通道配置
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-2"><strong>Webhook地址：</strong></p>
+                <p className="text-xs text-gray-500 font-mono break-all">
+                  https://open.feishu.cn/open-apis/bot/v2/hook/27c9ad3d-cf09-48f9-af93-fdd599240d60
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <p className="text-sm font-medium text-blue-800 mb-2">📊 发送内容</p>
+                  <ul className="text-xs text-blue-600 space-y-1">
+                    <li>✅ 日报</li>
+                    <li>✅ 周报</li>
+                    <li>✅ 告警通知</li>
+                    <li>✅ 技能动态（含操作按钮）</li>
+                  </ul>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm font-medium text-gray-800 mb-2">🧪 测试操作</p>
+                  <div className="space-y-2">
+                    <Button onClick={() => handleTest('internal')} variant="outline" className="w-full text-sm">
+                      🧪 测试内部通道
+                    </Button>
+                    <Button onClick={handleSendDaily} className="w-full text-sm bg-blue-500 hover:bg-blue-600">
+                      📊 发送日报
+                    </Button>
+                    <Button onClick={handleSendWeekly} className="w-full text-sm bg-purple-500 hover:bg-purple-600">
+                      📈 发送周报
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* 筛选 */}
-      <div className="flex gap-2 flex-wrap">
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-          className="border rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="">全部类型</option>
-          <option value="daily_report">日报</option>
-          <option value="weekly_report">周报</option>
-          <option value="alert_pending">告警</option>
-          <option value="manual_test">测试</option>
-        </select>
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="border rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="">全部状态</option>
-          <option value="success">成功</option>
-          <option value="failed">失败</option>
-        </select>
-        <Button onClick={() => { setFilterType(''); setFilterStatus(''); }} variant="outline" className="text-sm">
-          重置筛选
-        </Button>
-      </div>
+      {/* 外部通道内容 */}
+      {activeTab === 'external' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                外部通道配置
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600 mb-2"><strong>Webhook地址：</strong></p>
+                <p className="text-xs text-gray-500 font-mono break-all">
+                  https://open.feishu.cn/open-apis/bot/v2/hook/8ffc7c00-d5a8-432f-a28b-143f9a14637c
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-green-50 rounded-lg p-4">
+                  <p className="text-sm font-medium text-green-800 mb-2">📊 发送内容</p>
+                  <ul className="text-xs text-green-600 space-y-1">
+                    <li>❌ 日报（不发）</li>
+                    <li>✅ 周报</li>
+                    <li>✅ 告警通知</li>
+                    <li>✅ 技能动态（仅下载按钮）</li>
+                  </ul>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm font-medium text-gray-800 mb-2">🧪 测试操作</p>
+                  <div className="space-y-2">
+                    <Button onClick={() => handleTest('external')} variant="outline" className="w-full text-sm">
+                      🧪 测试外部通道
+                    </Button>
+                    <Button onClick={handleSendWeekly} className="w-full text-sm bg-purple-500 hover:bg-purple-600">
+                      📈 发送周报
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      {/* 日志列表 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">发送日志</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500 mx-auto"></div>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">类型</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">状态</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">发送时间</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">耗时</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">操作</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {logs.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${LOG_TYPE_COLORS[log.type] || 'bg-gray-100 text-gray-600'}`}>
-                          {LOG_TYPE_LABELS[log.type] || log.type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {log.status === 'success' ? (
-                          <span className="text-green-600 font-medium">✅ 成功</span>
-                        ) : (
-                          <span className="text-red-600 font-medium">❌ 失败</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {new Date(log.timestamp).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {log.duration_ms}ms
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleViewDetail(log.id)}
-                            className="text-blue-600 hover:text-blue-800 text-sm"
-                          >
-                            查看
-                          </button>
-                          {log.status === 'failed' && (
-                            <button
-                              onClick={() => handleRetry(log.id)}
-                              className="text-orange-600 hover:text-orange-800 text-sm"
-                            >
-                              重试
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {logs.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                        暂无日志
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+      {/* 发送日志内容 */}
+      {activeTab === 'logs' && (
+        <div className="space-y-6">
+          {/* 统计卡片 */}
+          {stats && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+                  <div className="text-xs text-gray-500">总发送次数</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <div className="text-2xl font-bold text-green-600">{stats.success}</div>
+                  <div className="text-xs text-gray-500">成功</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
+                  <div className="text-xs text-gray-500">失败</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-600">{stats.success_rate}%</div>
+                  <div className="text-xs text-gray-500">成功率</div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
-          {/* 分页 */}
-          {totalPages > 1 && (
-            <div className="flex justify-center gap-2 p-4 border-t">
-              <button
-                onClick={() => loadLogs(page - 1)}
-                disabled={page <= 0}
-                className="px-3 py-1 rounded-lg text-sm border hover:bg-gray-50 disabled:opacity-30"
-              >
-                上一页
-              </button>
-              <span className="px-3 py-1 text-sm text-gray-600">
-                第 {page + 1} / {totalPages} 页
-              </span>
-              <button
-                onClick={() => loadLogs(page + 1)}
-                disabled={page >= totalPages - 1}
-                className="px-3 py-1 rounded-lg text-sm border hover:bg-gray-50 disabled:opacity-30"
-              >
-                下一页
-              </button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          {/* 筛选 */}
+          <div className="flex gap-2 flex-wrap">
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">全部类型</option>
+              <option value="daily_report">日报</option>
+              <option value="weekly_report">周报</option>
+              <option value="alert_pending">告警</option>
+              <option value="manual_test">测试</option>
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">全部状态</option>
+              <option value="success">成功</option>
+              <option value="failed">失败</option>
+            </select>
+            <select
+              value={filterChannel}
+              onChange={(e) => setFilterChannel(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">全部通道</option>
+              <option value="internal">内部通道</option>
+              <option value="external">外部通道</option>
+            </select>
+            <Button onClick={() => { setFilterType(''); setFilterStatus(''); setFilterChannel(''); }} variant="outline" className="text-sm">
+              重置筛选
+            </Button>
+          </div>
+
+          {/* 日志列表 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">发送日志</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500 mx-auto"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">类型</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">通道</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">状态</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">发送时间</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">耗时</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {filteredLogs.map((log) => (
+                        <tr key={log.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${LOG_TYPE_COLORS[log.type] || 'bg-gray-100 text-gray-600'}`}>
+                              {LOG_TYPE_LABELS[log.type] || log.type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CHANNEL_COLORS[log.channel] || 'bg-gray-100 text-gray-600'}`}>
+                              {CHANNEL_LABELS[log.channel] || log.channel}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {log.status === 'success' ? (
+                              <span className="text-green-600 font-medium">✅ 成功</span>
+                            ) : (
+                              <span className="text-red-600 font-medium">❌ 失败</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            {new Date(log.timestamp).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            {log.duration_ms}ms
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2 items-center">
+                              <button
+                                onClick={() => handleViewDetail(log.id)}
+                                className="text-blue-600 hover:text-blue-800 text-sm"
+                              >
+                                查看
+                              </button>
+                              {/* 重发按钮 - 所有日志都显示 */}
+                              <div className="relative group">
+                                <button
+                                  className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+                                >
+                                  📤 重发
+                                </button>
+                                {/* 下拉菜单 */}
+                                <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                                  <button
+                                    onClick={() => handleRetry(log.id, 'internal')}
+                                    className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-t-lg"
+                                  >
+                                    📤 重发到内部群
+                                  </button>
+                                  <button
+                                    onClick={() => handleRetry(log.id, 'external')}
+                                    className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 rounded-b-lg"
+                                  >
+                                    📤 重发到外部群
+                                  </button>
+                                </div>
+                              </div>
+                              {/* 原重试按钮 - 仅失败日志显示 */}
+                              {log.status === 'failed' && (
+                                <button
+                                  onClick={() => handleRetry(log.id)}
+                                  className="text-orange-600 hover:text-orange-800 text-sm"
+                                >
+                                  重试原通道
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredLogs.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                            暂无日志
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* 分页 */}
+              {totalPages > 1 && (
+                <div className="flex justify-center gap-2 p-4 border-t">
+                  <button
+                    onClick={() => loadLogs(page - 1)}
+                    disabled={page <= 0}
+                    className="px-3 py-1 rounded-lg text-sm border hover:bg-gray-50 disabled:opacity-30"
+                  >
+                    上一页
+                  </button>
+                  <span className="px-3 py-1 text-sm text-gray-600">
+                    第 {page + 1} / {totalPages} 页
+                  </span>
+                  <button
+                    onClick={() => loadLogs(page + 1)}
+                    disabled={page >= totalPages - 1}
+                    className="px-3 py-1 rounded-lg text-sm border hover:bg-gray-50 disabled:opacity-30"
+                  >
+                    下一页
+                  </button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* 详情弹窗 */}
       {selectedLog && (
@@ -343,6 +514,10 @@ export function WebhookLogView({ token }: WebhookLogViewProps) {
                   <span className="ml-2">{LOG_TYPE_LABELS[selectedLog.type] || selectedLog.type}</span>
                 </div>
                 <div>
+                  <span className="text-gray-500">通道:</span>
+                  <span className="ml-2">{CHANNEL_LABELS[selectedLog.channel] || selectedLog.channel}</span>
+                </div>
+                <div>
                   <span className="text-gray-500">状态:</span>
                   <span className={`ml-2 font-medium ${selectedLog.status === 'success' ? 'text-green-600' : 'text-red-600'}`}>
                     {selectedLog.status === 'success' ? '✅ 成功' : '❌ 失败'}
@@ -356,21 +531,11 @@ export function WebhookLogView({ token }: WebhookLogViewProps) {
                   <span className="text-gray-500">发送时间:</span>
                   <span className="ml-2">{new Date(selectedLog.timestamp).toLocaleString()}</span>
                 </div>
-                <div>
-                  <span className="text-gray-500">HTTP状态码:</span>
-                  <span className="ml-2">{selectedLog.response_code || '-'}</span>
+                <div className="col-span-2">
+                  <span className="text-gray-500">Webhook地址:</span>
+                  <span className="ml-2 text-xs text-gray-600 break-all">{selectedLog.webhook_url}</span>
                 </div>
               </div>
-
-              {/* 业务数据快照 */}
-              {selectedLog.report_data && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="font-medium text-gray-700 mb-2">业务数据快照</h3>
-                  <pre className="text-xs text-gray-600 overflow-x-auto">
-                    {JSON.stringify(selectedLog.report_data, null, 2)}
-                  </pre>
-                </div>
-              )}
 
               {/* 请求内容 */}
               <div>
@@ -410,14 +575,21 @@ export function WebhookLogView({ token }: WebhookLogViewProps) {
                 >
                   关闭
                 </Button>
-                {selectedLog.status === 'failed' && (
+                {/* 重发按钮组 */}
+                <div className="flex gap-2 flex-1">
                   <Button
-                    onClick={() => { handleRetry(selectedLog.id); setSelectedLog(null); }}
-                    className="flex-1 bg-orange-500 hover:bg-orange-600"
+                    onClick={() => { handleRetry(selectedLog.id, 'internal'); setSelectedLog(null); }}
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-sm"
                   >
-                    重试发送
+                    📤 重发到内部群
                   </Button>
-                )}
+                  <Button
+                    onClick={() => { handleRetry(selectedLog.id, 'external'); setSelectedLog(null); }}
+                    className="flex-1 bg-green-500 hover:bg-green-600 text-sm"
+                  >
+                    📤 重发到外部群
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
