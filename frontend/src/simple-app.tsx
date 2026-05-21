@@ -8,6 +8,7 @@ import { useSkillDuration } from './hooks/use-skill-duration'
 import { ExpertReviewManager } from './components/expert-review-manager'
 import { AdminLogViewer } from './components/admin-log-viewer'
 import { WeeklyPicksManager } from './components/weekly-picks-manager'
+import { QuickStartPage } from './components/quickstart/quickstart-page'
 import { UploadZone } from './features/publish/upload-zone'
 import { SearchBar } from './features/search/search-bar'
 import { Button } from './shared/ui/button'
@@ -1314,7 +1315,7 @@ function SimpleSkillCard({ skill, onClick, onDelete }: { skill: Skill; onClick: 
 
 // Main App
 export function SimpleApp() {
-  const [currentView, setCurrentView] = useState<'start' | 'home' | 'publish' | 'detail' | 'stats' | 'admin' | 'webhook' | 'arena'>('start')
+  const [currentView, setCurrentView] = useState<'start' | 'home' | 'publish' | 'detail' | 'stats' | 'admin' | 'webhook' | 'arena' | 'quickstart'>('start')
   const [skills, setSkills] = useState<Skill[]>([])
   const [selectedSkill, setSelectedSkill] = useState<SkillDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -1532,7 +1533,7 @@ export function SimpleApp() {
             
             {/* 中间：导航栏目 */}
             <nav className="hidden sm:flex items-center gap-1">
-              {[{ key: 'start', label: '开始' }, { key: 'home', label: '浏览' }, { key: 'publish', label: '发布' }, { key: 'arena', label: 'Skill擂台' }, { key: 'stats', label: '展示' }, { key: 'admin', label: '上线与管理' }, { key: 'webhook', label: 'Webhook日志' }].map((item) => (
+              {[{ key: 'start', label: '开始' }, { key: 'home', label: '浏览' }, { key: 'publish', label: '发布' }, { key: 'arena', label: 'Skill擂台' }, { key: 'quickstart', label: '速成地图' }, { key: 'stats', label: '展示' }, { key: 'admin', label: '上线与管理' }, { key: 'webhook', label: 'Webhook日志' }].map((item) => (
                 <button 
                   key={item.key} 
                   onClick={() => item.key === 'admin' ? handleAdminClick() : item.key === 'webhook' ? handleWebhookClick() : setCurrentView(item.key as any)} 
@@ -1549,7 +1550,7 @@ export function SimpleApp() {
             {/* 移动端下拉 */}
             <div className="sm:hidden">
               <select value={currentView} onChange={(e) => { const v = e.target.value; v === 'admin' ? handleAdminClick() : v === 'webhook' ? handleWebhookClick() : setCurrentView(v as any) }} className="bg-gray-100 border-0 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-pink-500">
-                <option value="start">首页</option><option value="home">浏览</option><option value="publish">发布</option><option value="arena">Skill擂台</option><option value="stats">展示</option><option value="admin">上线与管理</option><option value="webhook">Webhook日志</option>
+                <option value="start">首页</option><option value="home">浏览</option><option value="publish">发布</option><option value="arena">Skill擂台</option><option value="quickstart">速成地图</option><option value="stats">展示</option><option value="admin">上线与管理</option><option value="webhook">Webhook日志</option>
               </select>
             </div>
           </div>
@@ -1646,6 +1647,9 @@ export function SimpleApp() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <ArenaPage />
           </div>
+        )}
+        {currentView === 'quickstart' && (
+          <QuickStartPage />
         )}
       </main>
 
@@ -1855,7 +1859,42 @@ function DetailView({ skill, on返回, on更新, on编辑 }: { skill: SkillDetai
                 <div key={v.id} className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
                   <div className="flex items-center gap-3"><span className="font-semibold text-gray-900">{v.version}</span>{v.tag && <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${v.tag === '稳定版' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{v.tag}</span>}{v.is_latest && <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-pink-100 text-pink-700">最新</span>}</div>
                   {skill.status === 'approved' ? (
-                    <a href={`/api/skills/${skill.slug}/download?version=${v.version}`} className="text-pink-600 hover:text-pink-700 font-medium text-sm flex items-center gap-1 hover:underline" download>下载<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg></a>
+                    v.is_latest ? (
+                      <a href={`/api/skills/${skill.slug}/download`} className="text-pink-600 hover:text-pink-700 font-medium text-sm flex items-center gap-1 hover:underline" download>下载<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg></a>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          const password = prompt('历史版本下载需要密码验证：');
+                          if (password) {
+                            fetch(`/api/skills/${skill.slug}/download?version=${v.version}`, {
+                              headers: { 'X-History-Password': password }
+                            }).then(response => {
+                              if (response.ok) {
+                                response.blob().then(blob => {
+                                  const url = window.URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = `${skill.slug}-${v.version}.zip`;
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  window.URL.revokeObjectURL(url);
+                                  document.body.removeChild(a);
+                                });
+                              } else if (response.status === 403) {
+                                alert('密码错误，无法下载历史版本');
+                              } else {
+                                alert('下载失败：' + response.statusText);
+                              }
+                            }).catch(() => {
+                              alert('下载失败，请稍后重试');
+                            });
+                          }
+                        }}
+                        className="text-pink-600 hover:text-pink-700 font-medium text-sm flex items-center gap-1 hover:underline"
+                      >
+                        下载<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                      </button>
+                    )
                   ) : (
                     <span className="text-gray-400 text-sm flex items-center gap-1 cursor-not-allowed">审核中<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg></span>
                   )}

@@ -281,7 +281,7 @@ def _send_weekly_report():
 
 
 def _check_pending_alerts():
-    """检查待审核告警 - 同时发送到内部和外部通道"""
+    """检查待审核告警 - 只发送到内部通道"""
     from app.notifier import FeishuNotifier
     from app.database import skills_db
     from app.config import PENDING_ALERT_THRESHOLD
@@ -303,9 +303,7 @@ def _check_pending_alerts():
             f"[scheduler] Pending alert sent to internal: {log_internal.status} ({len(pending)} pending)"
         )
 
-        # 外部通道
-        notifier_external = FeishuNotifier(channel="external")
-        log_external = notifier_external.send_alert(alert_data)
+        # 外部通道不发告警（告警仅限内部通道）
         print(
-            f"[scheduler] Pending alert sent to external: {log_external.status} ({len(pending)} pending)"
+            "[scheduler] Pending alert skipped for external channel (alerts are internal only)"
         )

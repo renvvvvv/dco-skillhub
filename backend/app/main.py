@@ -69,6 +69,11 @@ from app.metrics import (
 from app.expert_db import expert_db
 from app.code_quality import analyze_skill_package, code_checker
 from app.weekly_picks_db import weekly_picks_db
+from app.quickstart_db import (
+    scenario_maps_db,
+    collections_db,
+    quickstart_config_db,
+)
 
 app = FastAPI(
     title="随航守卫", version="1.0.0", docs_url="/api/docs", redoc_url="/api/redoc"
@@ -264,6 +269,9 @@ def list_skills(
     for s in skills:
         if "status" not in s:
             s["status"] = "approved"
+
+    # 市场列表只显示已审核通过的技能
+    skills = [s for s in skills if s.get("status") == "approved"]
 
     # 过滤（旧版单 tag 参数，基于版本 tag）
     if tag:
@@ -483,16 +491,12 @@ async def create_skill(
             file_size=final_path.stat().st_size,
         )
 
-        # 发送发布申请通知（给管理员）- 同时发送到内部和外部通道
+        # 发送发布申请通知（给管理员）- 只发送到内部通道
         try:
-            # 内部通道
-            notifier_internal = FeishuNotifier(channel="internal")
-            notifier_internal.send_publish_apply(skill_record)
-            # 外部通道
-            notifier_external = FeishuNotifier(channel="external")
-            notifier_external.send_publish_apply(skill_record)
-        except Exception:
-            pass
+            notifier = FeishuNotifier(channel="internal")
+            notifier.send_publish_apply(skill_record)
+        except Exception as e:
+            print(f"[publish] Failed to send notification: {e}")
 
         return {
             "success": True,
@@ -547,22 +551,63 @@ def download_skill(slug: str, version: str = Query(None), request: Request = Non
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
-    # 更新下载计数
-    def increment_download(data):
-        for s in data.get("skills", []):
-            if s["id"] == skill["id"]:
-                s["download_count"] = s.get("download_count", 0) + 1
-                s["updated_at"] = get_beijing_datetime()
-                break
+    # 判断是否为历史版本（非最新版本）
+    latest_version = skill.get("latest_version", "")
+    is_history_version = version != latest_version
 
-    skills_db.update(increment_download)
+    # 如果是历史版本，需要密码验证
+    if is_history_version:
+        # 从请求头或查询参数获取密码
+        password = request.headers.get("X-History-Password", "") if request else ""
+        if not password:
+            # 尝试从查询参数获取
+            from fastapi import Query
 
-    # 记录审计日志
+            password = (
+                request.query_params.get("password", "")
+                if request and hasattr(request, "query_params")
+                else ""
+            )
+
+        from app.config import HISTORY_VERSION_PASSWORD
+
+        if password != HISTORY_VERSION_PASSWORD:
+            raise HTTPException(
+                status_code=403,
+                detail="历史版本下载需要密码验证",
+                headers={"X-History-Version": "true"},
+            )
+
+    # 获取客户端IP
+    client_ip = get_client_ip(request)
+
+    # 检查该IP今日是否已下载过该技能
+    from app.events import get_events
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    today_downloads = get_events(date=today, event_type="skill.download", limit=10000)
+    already_downloaded = any(
+        e.get("ip") == client_ip and e.get("metadata", {}).get("slug") == slug
+        for e in today_downloads
+    )
+
+    if not already_downloaded:
+        # 更新下载计数（仅首次下载计数）
+        def increment_download(data):
+            for s in data.get("skills", []):
+                if s["id"] == skill["id"]:
+                    s["download_count"] = s.get("download_count", 0) + 1
+                    s["updated_at"] = get_beijing_datetime()
+                    break
+
+        skills_db.update(increment_download)
+
+    # 记录审计日志（每次下载都记录）
     add_audit_log("download", slug, skill["name"], "", f"下载版本 {version}", request)
 
-    # 记录埋点事件
+    # 记录埋点事件（每次下载都记录，用于分析）
     track_skill_download(
-        slug=slug, skill_name=skill["name"], version=version, ip=get_client_ip(request)
+        slug=slug, skill_name=skill["name"], version=version, ip=client_ip
     )
 
     return FileResponse(
@@ -1251,8 +1296,8 @@ def approve_skill(
             notifier_internal.send_publish_approve(skill, "管理员")
             notifier_external = FeishuNotifier(channel="external")
             notifier_external.send_publish_approve(skill, "管理员")
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[approve] Failed to send notification: {e}")
 
         return {"success": True, "message": "审核通过"}
 
@@ -1270,12 +1315,10 @@ def approve_skill(
         # 记录日志
         add_audit_log("reject", slug, skill["name"], "管理员", f"审核拒绝: {reason}")
 
-        # 发送审批拒绝通知（给提交人）- 同时发送到内部和外部通道
+        # 发送审批拒绝通知（给提交人）- 只发送到内部通道
         try:
-            notifier_internal = FeishuNotifier(channel="internal")
-            notifier_internal.send_publish_reject(skill, reason, "管理员")
-            notifier_external = FeishuNotifier(channel="external")
-            notifier_external.send_publish_reject(skill, reason, "管理员")
+            notifier = FeishuNotifier(channel="internal")
+            notifier.send_publish_reject(skill, reason, "管理员")
         except Exception:
             pass
 
@@ -1885,10 +1928,53 @@ def quick_approve(
             notifier_internal.send_publish_approve(skill, "管理员")
             notifier_external = FeishuNotifier(channel="external")
             notifier_external.send_publish_approve(skill, "管理员")
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[quick approve] Failed to send notification: {e}")
 
-        return {"success": True, "message": "审核通过"}
+        # 返回HTML页面，自动关闭或刷新
+        from fastapi.responses import HTMLResponse
+
+        html_content = (
+            """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>审核通过</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5; }
+                .container { text-align: center; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                .success { color: #10b981; font-size: 48px; margin-bottom: 16px; }
+                h1 { color: #1f2937; margin: 0 0 8px 0; }
+                p { color: #6b7280; margin: 0; }
+                .close-btn { margin-top: 20px; padding: 10px 24px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+                .close-btn:hover { background: #059669; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="success">✅</div>
+                <h1>审核通过</h1>
+                <p>技能 """
+            + skill.get("name", "")
+            + """ 已通过审核</p>
+                <button class="close-btn" onclick="window.close()">关闭窗口</button>
+            </div>
+            <script>
+                // 尝试通知 opener 窗口刷新
+                if (window.opener) {
+                    window.opener.location.reload();
+                }
+                // 3秒后自动关闭
+                setTimeout(function() {
+                    window.close();
+                }, 3000);
+            </script>
+        </body>
+        </html>
+        """
+        )
+        return HTMLResponse(content=html_content)
 
     else:  # reject
         # 更新技能状态为 rejected
@@ -1906,16 +1992,57 @@ def quick_approve(
             "reject", slug, skill["name"], "管理员", f"快速审核拒绝: {reason}"
         )
 
-        # 发送审批拒绝通知（给提交人）- 同时发送到内部和外部通道
+        # 发送审批拒绝通知（给提交人）- 只发送到内部通道
         try:
-            notifier_internal = FeishuNotifier(channel="internal")
-            notifier_internal.send_publish_reject(skill, reason, "管理员")
-            notifier_external = FeishuNotifier(channel="external")
-            notifier_external.send_publish_reject(skill, reason, "管理员")
-        except Exception:
-            pass
+            notifier = FeishuNotifier(channel="internal")
+            notifier.send_publish_reject(skill, reason, "管理员")
+        except Exception as e:
+            print(f"[quick reject] Failed to send notification: {e}")
 
-        return {"success": True, "message": "已拒绝"}
+        # 返回HTML页面，自动关闭或刷新
+        from fastapi.responses import HTMLResponse
+
+        html_content = (
+            """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>审核拒绝</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5; }
+                .container { text-align: center; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                .reject { color: #ef4444; font-size: 48px; margin-bottom: 16px; }
+                h1 { color: #1f2937; margin: 0 0 8px 0; }
+                p { color: #6b7280; margin: 0; }
+                .close-btn { margin-top: 20px; padding: 10px 24px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+                .close-btn:hover { background: #dc2626; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="reject">❌</div>
+                <h1>审核已拒绝</h1>
+                <p>技能 """
+            + skill.get("name", "")
+            + """ 已被拒绝</p>
+                <button class="close-btn" onclick="window.close()">关闭窗口</button>
+            </div>
+            <script>
+                // 尝试通知 opener 窗口刷新
+                if (window.opener) {
+                    window.opener.location.reload();
+                }
+                // 3秒后自动关闭
+                setTimeout(function() {
+                    window.close();
+                }, 3000);
+            </script>
+        </body>
+        </html>
+        """
+        )
+        return HTMLResponse(content=html_content)
 
 
 # ============ 指标标准 API ============
@@ -3196,6 +3323,220 @@ def get_weekly_pick_by_id(week_id: str):
             "picks": enriched_picks,
         },
     }
+
+
+# ==================== 速成地图 API ====================
+
+
+@app.get("/api/quickstart/config")
+def get_quickstart_config():
+    """获取速成地图配置（使用地图 + 标准文档）"""
+    config = quickstart_config_db.get_config()
+    return {"success": True, "data": config}
+
+
+@app.get("/api/quickstart/usage-map")
+def get_usage_map():
+    """获取速成 Skills 使用地图"""
+    config = quickstart_config_db.get_config()
+    return {"success": True, "data": config.get("usage_map", {})}
+
+
+@app.get("/api/quickstart/standards")
+def get_standards():
+    """获取上传 Skills 标准文档"""
+    config = quickstart_config_db.get_config()
+    return {"success": True, "data": config.get("standards", {})}
+
+
+# ---- 场景地图 API ----
+
+
+@app.get("/api/scenarios")
+def get_scenarios():
+    """获取所有场景地图"""
+    scenarios = scenario_maps_db.get_all()
+    return {"success": True, "data": scenarios}
+
+
+@app.get("/api/scenarios/{scenario_id}")
+def get_scenario_detail(scenario_id: str):
+    """获取场景地图详情"""
+    scenario = scenario_maps_db.get_by_id(scenario_id)
+    if not scenario:
+        raise HTTPException(status_code=404, detail="场景地图不存在")
+    return {"success": True, "data": scenario}
+
+
+@app.post("/api/scenarios")
+async def create_scenario(request: Request):
+    """创建场景地图"""
+    data = await request.json()
+    scenario = scenario_maps_db.create(data)
+    return {"success": True, "data": scenario}
+
+
+@app.put("/api/scenarios/{scenario_id}")
+async def update_scenario(scenario_id: str, request: Request):
+    """更新场景地图"""
+    data = await request.json()
+    scenario = scenario_maps_db.update(scenario_id, data)
+    if not scenario:
+        raise HTTPException(status_code=404, detail="场景地图不存在")
+    return {"success": True, "data": scenario}
+
+
+@app.delete("/api/scenarios/{scenario_id}")
+def delete_scenario(scenario_id: str):
+    """删除场景地图"""
+    if scenario_maps_db.delete(scenario_id):
+        return {"success": True, "message": "删除成功"}
+    raise HTTPException(status_code=404, detail="场景地图不存在")
+
+
+@app.post("/api/scenarios/{scenario_id}/skills")
+async def update_scenario_skills(scenario_id: str, request: Request):
+    """更新场景地图关联的技能（支持多选）"""
+    data = await request.json()
+    skills = data.get("skills", [])
+
+    scenario = scenario_maps_db.update_skills(scenario_id, skills)
+    if not scenario:
+        raise HTTPException(status_code=404, detail="场景地图不存在")
+    return {"success": True, "data": scenario}
+
+
+@app.put("/api/scenarios/{scenario_id}/skills/reorder")
+async def reorder_scenario_skills(scenario_id: str, request: Request):
+    """重新排序场景地图中的技能"""
+    data = await request.json()
+    skill_orders = data.get("skill_orders", [])
+
+    scenario = scenario_maps_db.reorder_skills(scenario_id, skill_orders)
+    if not scenario:
+        raise HTTPException(status_code=404, detail="场景地图不存在")
+    return {"success": True, "data": scenario}
+
+
+# ---- 精选集 API ----
+
+
+@app.get("/api/collections")
+def get_collections():
+    """获取所有精选集"""
+    collections = collections_db.get_all()
+    return {"success": True, "data": collections}
+
+
+@app.get("/api/collections/{collection_id}")
+def get_collection_detail(collection_id: str):
+    """获取精选集详情"""
+    collection = collections_db.get_by_id(collection_id)
+    if not collection:
+        raise HTTPException(status_code=404, detail="精选集不存在")
+    return {"success": True, "data": collection}
+
+
+@app.post("/api/collections")
+async def create_collection(request: Request):
+    """创建精选集"""
+    data = await request.json()
+    collection = collections_db.create(data)
+    return {"success": True, "data": collection}
+
+
+@app.put("/api/collections/{collection_id}")
+async def update_collection(collection_id: str, request: Request):
+    """更新精选集"""
+    data = await request.json()
+    collection = collections_db.update(collection_id, data)
+    if not collection:
+        raise HTTPException(status_code=404, detail="精选集不存在")
+    return {"success": True, "data": collection}
+
+
+@app.delete("/api/collections/{collection_id}")
+def delete_collection(collection_id: str):
+    """删除精选集"""
+    if collections_db.delete(collection_id):
+        return {"success": True, "message": "删除成功"}
+    raise HTTPException(status_code=404, detail="精选集不存在")
+
+
+@app.post("/api/collections/{collection_id}/skills")
+async def update_collection_skills(collection_id: str, request: Request):
+    """更新精选集关联的技能（支持多选）"""
+    data = await request.json()
+    skills = data.get("skills", [])
+
+    collection = collections_db.update_skills(collection_id, skills)
+    if not collection:
+        raise HTTPException(status_code=404, detail="精选集不存在")
+    return {"success": True, "data": collection}
+
+
+@app.post("/api/collections/{collection_id}/play")
+def increment_collection_play(collection_id: str):
+    """增加精选集使用次数"""
+    collection = collections_db.increment_play_count(collection_id)
+    if not collection:
+        raise HTTPException(status_code=404, detail="精选集不存在")
+    return {"success": True, "data": collection}
+
+
+# ---- 技能关联查询 API ----
+
+
+@app.get("/api/skills/with-associations")
+def get_skills_with_associations():
+    """获取所有技能及其关联信息"""
+    skills_data = skills_db.read()
+    skills = skills_data.get("skills", [])
+
+    scenarios = scenario_maps_db.get_all()
+    collections = collections_db.get_all()
+
+    # 为每个技能添加关联信息
+    result = []
+    for skill in skills:
+        skill_id = skill.get("id")
+        skill_slug = skill.get("slug")
+
+        # 查找关联的场景地图
+        related_scenarios = []
+        for scenario in scenarios:
+            for s in scenario.get("skills", []):
+                if s.get("skill_id") == skill_id or s.get("skill_slug") == skill_slug:
+                    related_scenarios.append(
+                        {
+                            "scenario_id": scenario["id"],
+                            "scenario_name": scenario["name"],
+                            "config": s.get("config", {}),
+                        }
+                    )
+
+        # 查找关联的精选集
+        related_collections = []
+        for collection in collections:
+            for s in collection.get("skills", []):
+                if s.get("skill_id") == skill_id or s.get("skill_slug") == skill_slug:
+                    related_collections.append(
+                        {
+                            "collection_id": collection["id"],
+                            "collection_name": collection["name"],
+                            "config": s.get("config", {}),
+                        }
+                    )
+
+        result.append(
+            {
+                **skill,
+                "related_scenarios": related_scenarios,
+                "related_collections": related_collections,
+            }
+        )
+
+    return {"success": True, "data": result}
 
 
 if __name__ == "__main__":

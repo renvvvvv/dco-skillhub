@@ -122,6 +122,11 @@ METRIC_STANDARDS = {
     },
 }
 
+# 历史版本下载密码
+HISTORY_VERSION_PASSWORD = os.getenv(
+    "HISTORY_VERSION_PASSWORD", "skillhub-history-2026"
+)
+
 # 应用配置
 APP_NAME = "随航守卫"
 APP_VERSION = "1.0.0"

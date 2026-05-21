@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
 
   backend:
-    image: doc-skillhub-backend:new
+    build: ./backend
     expose:
       - "8080"
     volumes:
