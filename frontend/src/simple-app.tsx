@@ -818,8 +818,8 @@ function StatsView() {
                       <span className="text-xs text-gray-500">
                         下载: <span className="font-medium text-gray-700">{item.downloads}</span>
                       </span>
-                      <span className="text-sm font-bold text-purple-600">
-                        {rankingMetric === 'publishes' ? item.publishes : item.downloads}
+                      <span className="text-xs text-purple-500 bg-purple-50 px-2 py-0.5 rounded">
+                        得分: {item.score}
                       </span>
                     </div>
                   </div>
@@ -828,8 +828,8 @@ function StatsView() {
                       className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all"
                       style={{ 
                         width: `${Math.max(
-                          combinedRankings[0]?.[rankingMetric] > 0 
-                            ? (item[rankingMetric] / combinedRankings[0][rankingMetric]) * 100 
+                          combinedRankings[0]?.score > 0 
+                            ? (item.score / combinedRankings[0].score) * 100 
                             : 0, 
                           5
                         )}%` 
@@ -1015,11 +1015,30 @@ function AdminView({ onLogout }: { onLogout: () => void }) {
                 <div className="space-y-3">
                   {pendingSkills.map(skill => (
                     <div key={skill.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                      <div>
-                        <p className="font-semibold text-gray-900">{skill.name}</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-gray-900">{skill.name}</p>
+                          {(skill as any).auto_score !== undefined && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full font-medium ${
+                              (skill as any).auto_score >= 80 ? 'bg-green-100 text-green-700' :
+                              (skill as any).auto_score >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              自动评分: {(skill as any).auto_score}分 ({(skill as any).auto_grade})
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-500">作者: {skill.author_name} | 部门: {(skill as any).author_department || '-'} | 版本: {skill.latest_version}</p>
                         <p className="text-xs text-gray-400 mt-1">提交时间: {new Date(skill.created_at).toLocaleString()}</p>
-                        <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${(skill as any).status === 'delete_pending' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{(skill as any).status === 'delete_pending' ? '删除申请' : '审核中'}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${(skill as any).status === 'delete_pending' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{(skill as any).status === 'delete_pending' ? '删除申请' : '审核中'}</span>
+                          {(skill as any).audit_issues > 0 && (
+                            <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700">
+                              发现问题: {(skill as any).audit_issues}个
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         {(skill as any).status === 'delete_pending' ? (
@@ -1050,10 +1069,27 @@ function AdminView({ onLogout }: { onLogout: () => void }) {
                 <div className="space-y-3">
                   {pendingVersions.map(v => (
                     <div key={v.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                      <div>
-                        <p className="font-semibold text-gray-900">{v.skill_name}</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-gray-900">{v.skill_name}</p>
+                          {v.auto_score !== undefined && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full font-medium ${
+                              v.auto_score >= 80 ? 'bg-green-100 text-green-700' :
+                              v.auto_score >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              自动评分: {v.auto_score}分 ({v.auto_grade})
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-500">新版本: {v.version} | 标签: {v.tag}</p>
                         <p className="text-xs text-gray-400 mt-1">提交时间: {new Date(v.created_at).toLocaleString()}</p>
+                        {v.audit_issues > 0 && (
+                          <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700">
+                            发现问题: {v.audit_issues}个
+                          </span>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => handleApprove(v.skill_slug, 'approve')} className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium rounded-lg hover:shadow-lg transition-all">通过</button>

@@ -93,6 +93,144 @@ def _hourly_maintenance():
     _aggregate_today()
 
 
+def _backup_skills_daily():
+    """每日自动备份技能数据（增强版持久化备份）
+
+    备份内容：
+    1. JSON数据文件（skills.json, versions.json等）
+    2. 技能ZIP文件（storage目录）
+    3. Webhook日志
+    4. 用户活动日志
+    5. 审计日志
+
+    备份位置：/root/doc-skillhub/persistent-backup/
+    保留策略：保留90天
+    """
+    import shutil
+    from datetime import datetime, timedelta
+    from app.config import DATA_DIR, STORAGE_DIR
+
+    try:
+        # 使用持久化备份目录
+        backup_base = Path("/root/doc-skillhub/persistent-backup")
+        backup_base.mkdir(exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_subdir = backup_base / f"daily_{timestamp}"
+        backup_subdir.mkdir(exist_ok=True)
+
+        # 1. 备份JSON数据文件
+        backup_data_dir = backup_subdir / "data"
+        backup_data_dir.mkdir(exist_ok=True)
+
+        files_to_backup = [
+            "skills.json",
+            "versions.json",
+            "audit_logs.json",
+            "views.json",
+            "view_records.json",
+            "search_index.json",
+            "metrics_daily.json",
+            "user_activity_logs.json",
+            "expert_reviews.json",
+            "code_audit_logs.json",
+            "webhook_logs.json",
+            "staff.json",
+            "staff_dictionary.json",
+            "staff_dictionary_v2.json",
+        ]
+
+        backed_up_files = []
+        for filename in files_to_backup:
+            src = DATA_DIR / filename
+            if src.exists():
+                dst = backup_data_dir / filename
+                shutil.copy2(src, dst)
+                backed_up_files.append(filename)
+
+        # 2. 备份技能ZIP文件（关键！）
+        backup_storage_dir = backup_subdir / "storage"
+        backup_storage_dir.mkdir(exist_ok=True)
+
+        if STORAGE_DIR.exists():
+            # 使用rsync风格备份，只复制变更的文件
+            for skill_dir in STORAGE_DIR.iterdir():
+                if skill_dir.is_dir():
+                    dst_skill_dir = backup_storage_dir / skill_dir.name
+                    if dst_skill_dir.exists():
+                        shutil.rmtree(dst_skill_dir)
+                    shutil.copytree(skill_dir, dst_skill_dir)
+
+        # 3. 备份日志文件（从Docker Volume）
+        backup_logs_dir = backup_subdir / "logs"
+        backup_logs_dir.mkdir(exist_ok=True)
+
+        logs_to_backup = [
+            (DATA_DIR / "webhook_logs.json", backup_logs_dir / "webhook_logs.json"),
+            (
+                DATA_DIR / "user_activity_logs.json",
+                backup_logs_dir / "user_activity_logs.json",
+            ),
+            (DATA_DIR / "audit_logs.json", backup_logs_dir / "audit_logs.json"),
+        ]
+
+        for src, dst in logs_to_backup:
+            if src.exists():
+                shutil.copy2(src, dst)
+
+        # 4. 生成备份清单
+        manifest = {
+            "timestamp": timestamp,
+            "backup_type": "daily_full",
+            "data_files": backed_up_files,
+            "storage_skills": len(list(backup_storage_dir.iterdir()))
+            if backup_storage_dir.exists()
+            else 0,
+            "backup_path": str(backup_subdir),
+        }
+
+        manifest_path = backup_subdir / "backup.manifest.json"
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            import json
+
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+        # 5. 更新latest软链接
+        latest_link = backup_base / "latest"
+        if latest_link.exists() or latest_link.is_symlink():
+            latest_link.unlink()
+        latest_link.symlink_to(backup_subdir, target_is_directory=True)
+
+        # 6. 清理旧备份（保留90天）
+        cutoff_date = datetime.now() - timedelta(days=90)
+        cleaned_count = 0
+
+        for old_backup in backup_base.iterdir():
+            if old_backup.is_dir() and old_backup.name.startswith("daily_"):
+                try:
+                    backup_date = datetime.strptime(
+                        old_backup.name.replace("daily_", ""), "%Y%m%d_%H%M%S"
+                    )
+                    if backup_date < cutoff_date:
+                        shutil.rmtree(old_backup)
+                        cleaned_count += 1
+                except ValueError:
+                    continue
+
+        print(f"[scheduler] Daily backup completed: {backup_subdir}")
+        print(
+            f"[scheduler] Backed up {len(backed_up_files)} data files, {manifest['storage_skills']} skills"
+        )
+        if cleaned_count > 0:
+            print(f"[scheduler] Cleaned {cleaned_count} old backups")
+
+    except Exception as e:
+        print(f"[scheduler] Daily backup failed: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
 def start_scheduler() -> bool:
     """启动后台定时任务调度器
 
@@ -181,6 +319,15 @@ def start_scheduler() -> bool:
             name="Check pending skills alert",
             replace_existing=True,
         )
+
+    # 7. 每日自动备份技能数据（凌晨1点执行）
+    _scheduler.add_job(
+        _backup_skills_daily,
+        CronTrigger(hour=1, minute=0),
+        id="daily_backup",
+        name="Daily backup skills data",
+        replace_existing=True,
+    )
 
     _scheduler.start()
     print("[scheduler] Background scheduler started")

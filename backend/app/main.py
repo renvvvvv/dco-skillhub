@@ -188,6 +188,26 @@ def _upsert_staff(name: str, employee_id: str, department: str, organization: st
     staff_db.update(updater)
 
 
+def _record_backup_log(slug: str, version: str, path: str, size: int):
+    """记录备份日志
+
+    Args:
+        slug: 技能slug
+        version: 版本号
+        path: 备份路径
+        size: 文件大小
+    """
+    try:
+        log_file = Path("/app/data/backup/backup.log")
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().isoformat()
+        log_entry = f"[{timestamp}] BACKUP slug={slug} version={version} path={path} size={size}\n"
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(log_entry)
+    except Exception as e:
+        print(f"[Backup] Failed to record backup log: {e}")
+
+
 def get_client_ip(request: Request) -> str:
     xff = request.headers.get("x-forwarded-for")
     return xff.split(",")[0].strip() if xff else request.client.host
@@ -581,26 +601,15 @@ def download_skill(slug: str, version: str = Query(None), request: Request = Non
     # 获取客户端IP
     client_ip = get_client_ip(request)
 
-    # 检查该IP今日是否已下载过该技能
-    from app.events import get_events
+    # 更新下载计数（每次下载都计数，不检测重复）
+    def increment_download(data):
+        for s in data.get("skills", []):
+            if s["id"] == skill["id"]:
+                s["download_count"] = s.get("download_count", 0) + 1
+                s["updated_at"] = get_beijing_datetime()
+                break
 
-    today = datetime.now().strftime("%Y-%m-%d")
-    today_downloads = get_events(date=today, event_type="skill.download", limit=10000)
-    already_downloaded = any(
-        e.get("ip") == client_ip and e.get("metadata", {}).get("slug") == slug
-        for e in today_downloads
-    )
-
-    if not already_downloaded:
-        # 更新下载计数（仅首次下载计数）
-        def increment_download(data):
-            for s in data.get("skills", []):
-                if s["id"] == skill["id"]:
-                    s["download_count"] = s.get("download_count", 0) + 1
-                    s["updated_at"] = get_beijing_datetime()
-                    break
-
-        skills_db.update(increment_download)
+    skills_db.update(increment_download)
 
     # 记录审计日志（每次下载都记录）
     add_audit_log("download", slug, skill["name"], "", f"下载版本 {version}", request)
@@ -672,6 +681,36 @@ async def create_version(
 
         versions_db.update(add_version)
 
+        # 实时备份到持久化目录（三重备份策略）
+        try:
+            # 使用容器内的 /app/data/backup/ 目录（在Docker volume中，可持久化）
+            backup_base_dir = Path("/app/data/backup")
+            backup_base_dir.mkdir(parents=True, exist_ok=True)
+
+            # 1. 备份到持久化目录（主要备份）
+            persistent_dir = backup_base_dir / "skills" / slug / version
+            persistent_dir.mkdir(parents=True, exist_ok=True)
+            persistent_path = persistent_dir / file_name
+            shutil.copy2(str(final_path), str(persistent_path))
+
+            # 2. 备份到archive目录（版本归档）
+            archive_dir = backup_base_dir / "archive" / datetime.now().strftime("%Y%m")
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            archive_path = (
+                archive_dir
+                / f"{slug}_{version}_{datetime.now().strftime('%d%H%M%S')}.zip"
+            )
+            shutil.copy2(str(final_path), str(archive_path))
+
+            # 3. 记录备份日志
+            _record_backup_log(
+                slug, version, str(persistent_path), final_path.stat().st_size
+            )
+
+            print(f"[Backup] Skill {slug} v{version} backed up to persistent storage")
+        except Exception as backup_err:
+            print(f"[Backup] Failed to backup {slug} v{version}: {backup_err}")
+
         # 更新技能状态为 pending
         def update_skill_status(data):
             for s in data.get("skills", []):
@@ -681,6 +720,18 @@ async def create_version(
                     break
 
         skills_db.update(update_skill_status)
+
+        # 自动执行代码审计
+        try:
+            from app.code_quality import run_auto_audit
+
+            audit_results = run_auto_audit(final_path, slug, expert_db)
+            print(
+                f"[Auto Audit] Skill {slug} v{version}: score={audit_results.get('overall_score')}, grade={audit_results.get('overall_grade')}"
+            )
+        except Exception as audit_err:
+            print(f"[Auto Audit] Failed for {slug}: {audit_err}")
+            audit_results = None
 
         # 记录日志
         add_audit_log(
@@ -700,6 +751,19 @@ async def create_version(
                 "tag": tag,
                 "downloadUrl": f"/api/skills/{slug}/download?version={version}",
                 "message": "新版本已提交，等待审核",
+                "audit": {
+                    "score": audit_results.get("overall_score")
+                    if audit_results
+                    else None,
+                    "grade": audit_results.get("overall_grade")
+                    if audit_results
+                    else None,
+                    "issues": audit_results.get("summary", {}).get("total_issues")
+                    if audit_results
+                    else None,
+                }
+                if audit_results
+                else None,
             },
         }
 
@@ -1193,9 +1257,27 @@ def get_pending(request: Request):
     versions = versions_data.get("versions", [])
 
     # 待审核的技能（status = pending 或 delete_pending）
-    pending_skills = [
-        s for s in skills if s.get("status") in ("pending", "delete_pending")
-    ]
+    pending_skills = []
+    for s in skills:
+        if s.get("status") in ("pending", "delete_pending"):
+            skill_data = dict(s)
+            # 获取最新的代码审计结果
+            try:
+                audit_logs = expert_db.get_code_audit_logs(skill_id=s["slug"], limit=1)
+                if audit_logs:
+                    latest_audit = audit_logs[0]
+                    skill_data["auto_score"] = latest_audit.get("score")
+                    skill_data["auto_grade"] = latest_audit.get("results", {}).get(
+                        "overall_grade"
+                    )
+                    skill_data["audit_issues"] = (
+                        latest_audit.get("results", {})
+                        .get("summary", {})
+                        .get("total_issues", 0)
+                    )
+            except Exception:
+                pass
+            pending_skills.append(skill_data)
 
     # 待审核的版本（is_latest = False 且 skill 状态为 pending）
     pending_versions = []
@@ -1203,9 +1285,30 @@ def get_pending(request: Request):
         if not v.get("is_latest"):
             skill = next((s for s in skills if s["id"] == v["skill_id"]), None)
             if skill and skill.get("status") == "pending":
-                pending_versions.append(
-                    {**v, "skill_name": skill["name"], "skill_slug": skill["slug"]}
-                )
+                version_data = {
+                    **v,
+                    "skill_name": skill["name"],
+                    "skill_slug": skill["slug"],
+                }
+                # 获取该版本的代码审计结果
+                try:
+                    audit_logs = expert_db.get_code_audit_logs(
+                        skill_id=skill["slug"], limit=1
+                    )
+                    if audit_logs:
+                        latest_audit = audit_logs[0]
+                        version_data["auto_score"] = latest_audit.get("score")
+                        version_data["auto_grade"] = latest_audit.get(
+                            "results", {}
+                        ).get("overall_grade")
+                        version_data["audit_issues"] = (
+                            latest_audit.get("results", {})
+                            .get("summary", {})
+                            .get("total_issues", 0)
+                        )
+                except Exception:
+                    pass
+                pending_versions.append(version_data)
 
     return {
         "success": True,
@@ -2903,18 +3006,22 @@ def get_combined_rankings(
             )
             combined_stats[center_id]["skills"].append(skill.get("name"))
 
-    # 根据指标排序
+    # 计算综合得分：发布*0.4 + 下载*0.6
+    for item in combined_stats.values():
+        item["score"] = round(item["publishes"] * 0.4 + item["downloads"] * 0.6, 2)
+
+    # 根据综合得分排序
     rankings = sorted(
         combined_stats.values(),
-        key=lambda x: x.get(metric, 0),
+        key=lambda x: x["score"],
         reverse=True,
     )[:limit]
 
     return {
         "success": True,
         "data": {
-            "metric": metric,
-            "metric_label": "发布量" if metric == "publishes" else "下载量",
+            "metric": "composite",
+            "metric_label": "综合得分(发布×0.4+下载×0.6)",
             "rankings": rankings,
         },
     }
@@ -3092,6 +3199,108 @@ def get_all_audit_logs(limit: int = Query(100, description="返回数量")):
     logs = expert_db.get_code_audit_logs(limit=limit)
 
     return {"success": True, "data": logs}
+
+
+@app.post("/api/admin/run-batch-audit")
+def run_batch_audit(request: Request):
+    """对所有已发布技能执行批量代码审计"""
+    verify_admin_token(request)
+
+    skills_data = skills_db.read()
+    skills = skills_data.get("skills", [])
+
+    # 只处理已发布的技能
+    approved_skills = [s for s in skills if s.get("status") == "approved"]
+
+    results = {"total": len(approved_skills), "success": 0, "failed": 0, "details": []}
+
+    for skill in approved_skills:
+        slug = skill.get("slug")
+        name = skill.get("name")
+
+        try:
+            # 获取Skill的存储路径
+            versions_data = versions_db.read()
+            versions = versions_data.get("versions", [])
+            skill_versions = [
+                v for v in versions if v.get("skill_id") == skill.get("id")
+            ]
+
+            if not skill_versions:
+                results["failed"] += 1
+                results["details"].append(
+                    {
+                        "slug": slug,
+                        "name": name,
+                        "status": "failed",
+                        "reason": "无版本记录",
+                    }
+                )
+                continue
+
+            latest_version = max(skill_versions, key=lambda x: x.get("created_at", ""))
+            storage_path = latest_version.get("storage_path")
+
+            if not storage_path:
+                results["failed"] += 1
+                results["details"].append(
+                    {
+                        "slug": slug,
+                        "name": name,
+                        "status": "failed",
+                        "reason": "无存储路径",
+                    }
+                )
+                continue
+
+            skill_path = STORAGE_DIR / storage_path
+
+            if not skill_path.exists():
+                results["failed"] += 1
+                results["details"].append(
+                    {
+                        "slug": slug,
+                        "name": name,
+                        "status": "failed",
+                        "reason": "文件不存在",
+                    }
+                )
+                continue
+
+            # 执行代码检测
+            audit_results = analyze_skill_package(skill_path)
+
+            # 记录审计日志
+            expert_db.log_code_audit(
+                skill_id=slug,
+                audit_type="automated_batch",
+                results=audit_results,
+                score=audit_results.get("overall_score") or 0.0,
+            )
+
+            results["success"] += 1
+            results["details"].append(
+                {
+                    "slug": slug,
+                    "name": name,
+                    "status": "success",
+                    "score": audit_results.get("overall_score"),
+                    "grade": audit_results.get("overall_grade"),
+                    "issues": audit_results.get("summary", {}).get("total_issues", 0),
+                }
+            )
+
+        except Exception as e:
+            results["failed"] += 1
+            results["details"].append(
+                {"slug": slug, "name": name, "status": "failed", "reason": str(e)}
+            )
+
+    return {
+        "success": True,
+        "data": results,
+        "message": f"批量审计完成: {results['success']}/{results['total']} 成功, {results['failed']} 失败",
+    }
 
 
 # ========== 小智优选 API ==========

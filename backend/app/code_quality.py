@@ -1,7 +1,9 @@
-"""自动化代码质量检测"""
+"""自动化代码质量检测 - 增强版"""
 
 import re
 import json
+import zipfile
+import shutil
 from pathlib import Path
 from typing import Dict, List, Any
 from datetime import datetime
@@ -9,6 +11,13 @@ from datetime import datetime
 
 class CodeQualityChecker:
     """代码质量检测器"""
+
+    # 严重程度权重
+    SEVERITY_WEIGHTS = {
+        "critical": 15,  # 严重问题扣15分
+        "warning": 5,  # 警告扣5分
+        "info": 1,  # 提示扣1分
+    }
 
     def __init__(self):
         self.issues = []
@@ -28,8 +37,8 @@ class CodeQualityChecker:
         else:
             self._check_generic_code(code_content)
 
-        # 计算最终分数
-        self.score = max(0, 100 - len(self.issues) * 2)
+        # 按严重程度加权计算分数
+        self.score = self._calculate_weighted_score()
 
         return {
             "score": self.score,
@@ -44,6 +53,16 @@ class CodeQualityChecker:
                 "info": len([i for i in self.issues if i["severity"] == "info"]),
             },
         }
+
+    def _calculate_weighted_score(self) -> int:
+        """按严重程度加权计算分数"""
+        total_deduction = 0
+        for issue in self.issues:
+            severity = issue.get("severity", "info")
+            weight = self.SEVERITY_WEIGHTS.get(severity, 1)
+            total_deduction += weight
+
+        return max(0, 100 - total_deduction)
 
     def _check_python_code(self, code: str):
         """检查Python代码"""
@@ -98,7 +117,9 @@ class CodeQualityChecker:
                     function_lines += 1
 
         # 检查是否有文档字符串
-        if not re.search(r'""".*?"""', code, re.DOTALL) and not re.search(r"'''.*?'''"):
+        if not re.search(r'""".*?"""', code, re.DOTALL) and not re.search(
+            r"'''.*?'''", code, re.DOTALL
+        ):
             self.issues.append(
                 {
                     "severity": "warning",
@@ -316,15 +337,55 @@ def analyze_skill_package(skill_path: Path) -> dict:
     if not skill_path.exists():
         return results
 
+    # 如果是zip文件，先解压到临时目录
+    temp_dir = None
+    analyze_path = skill_path
+
+    if skill_path.suffix.lower() == ".zip":
+        temp_dir = Path(
+            f"/tmp/skill_audit_{skill_path.stem}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        )
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            with zipfile.ZipFile(skill_path, "r") as zip_ref:
+                zip_ref.extractall(temp_dir)
+            analyze_path = temp_dir
+        except Exception as e:
+            results["files"].append(
+                {
+                    "file_path": str(skill_path),
+                    "score": 0,
+                    "grade": "Error",
+                    "issues": [
+                        {
+                            "severity": "critical",
+                            "category": "error",
+                            "message": f"无法解压文件: {str(e)}",
+                            "line": 1,
+                        }
+                    ],
+                    "summary": {
+                        "total_issues": 1,
+                        "critical": 1,
+                        "warning": 0,
+                        "info": 0,
+                    },
+                }
+            )
+            results["summary"]["total_files"] = 1
+            results["summary"]["total_issues"] = 1
+            results["summary"]["critical_issues"] = 1
+            return results
+
     total_score = 0
     file_count = 0
 
     # 遍历所有文件
-    for file_path in skill_path.rglob("*"):
+    for file_path in analyze_path.rglob("*"):
         if file_path.is_file():
             try:
                 content = file_path.read_text(encoding="utf-8")
-                relative_path = str(file_path.relative_to(skill_path))
+                relative_path = str(file_path.relative_to(analyze_path))
 
                 # 确定文件类型
                 suffix = file_path.suffix.lower()
@@ -359,9 +420,10 @@ def analyze_skill_package(skill_path: Path) -> dict:
                 results["summary"]["info_issues"] += file_result["summary"]["info"]
 
             except Exception as e:
+                file_name = str(file_path.name) if file_path else "unknown"
                 results["files"].append(
                     {
-                        "file_path": relative_path,
+                        "file_path": file_name,
                         "score": 0,
                         "grade": "Error",
                         "issues": [
@@ -387,7 +449,41 @@ def analyze_skill_package(skill_path: Path) -> dict:
         results["overall_score"] = round(total_score / file_count, 1)
         results["overall_grade"] = checker._get_grade(int(results["overall_score"]))
 
+    # 清理临时目录
+    if temp_dir and temp_dir.exists():
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
     return results
+
+
+def run_auto_audit(skill_path: Path, skill_slug: str, expert_db=None) -> dict:
+    """
+    运行自动审计并记录结果
+
+    Args:
+        skill_path: Skill文件路径
+        skill_slug: Skill标识
+        expert_db: 专家数据库实例（用于记录日志）
+
+    Returns:
+        审计结果
+    """
+    # 执行代码检测
+    audit_results = analyze_skill_package(skill_path)
+
+    # 记录审计日志
+    if expert_db:
+        from app.expert_db import ExpertReviewDatabase
+
+        if isinstance(expert_db, ExpertReviewDatabase):
+            expert_db.log_code_audit(
+                skill_id=skill_slug,
+                audit_type="automated",
+                results=audit_results,
+                score=audit_results.get("overall_score") or 0.0,
+            )
+
+    return audit_results
 
 
 # 全局实例
