@@ -9,6 +9,7 @@ import { ExpertReviewManager } from './components/expert-review-manager'
 import { AdminLogViewer } from './components/admin-log-viewer'
 import { WeeklyPicksManager } from './components/weekly-picks-manager'
 import { QuickStartPage } from './components/quickstart/quickstart-page'
+import { ScenarioMapPage } from './components/quickstart/scenario-map-page'
 import { UploadZone } from './features/publish/upload-zone'
 import { SearchBar } from './features/search/search-bar'
 import { Button } from './shared/ui/button'
@@ -458,7 +459,7 @@ function StatsView() {
   const [realtime, setRealtime] = useState<RealtimeEvent[]>([])
   const [searchAnalysis, setSearchAnalysis] = useState<SearchAnalysis | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('week')
+  const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'total'>('week')
   const [regionRankings, setRegionRankings] = useState<any[]>([])
   const [centerRankings, setCenterRankings] = useState<any[]>([])
   const [combinedRankings, setCombinedRankings] = useState<any[]>([])
@@ -515,7 +516,7 @@ function StatsView() {
     )
   }
 
-  const kpiData = kpi?.[timeRange === 'week' ? 'this_week' : timeRange === 'month' ? 'this_month' : 'today'] || kpi?.today
+  const kpiData = kpi?.[timeRange === 'week' ? 'this_week' : timeRange === 'month' ? 'this_month' : timeRange === 'total' ? 'total' : 'today'] || kpi?.today
   const downloadSorted = stats ? [...stats.skills].sort((a, b) => b.downloads - a.downloads).slice(0, 10) : []
   const devSorted = stats ? [...stats.developers].sort((a, b) => b.count - a.count).slice(0, 10) : []
 
@@ -528,7 +529,7 @@ function StatsView() {
           <p className="text-sm text-gray-500 mt-1">实时监控技能市场运营数据</p>
         </div>
         <div className="flex bg-gray-100 rounded-lg p-1">
-          {(['today', 'week', 'month'] as const).map(r => (
+          {(['today', 'week', 'month', 'total'] as const).map(r => (
             <button
               key={r}
               onClick={() => setTimeRange(r)}
@@ -536,7 +537,7 @@ function StatsView() {
                 timeRange === r ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {r === 'today' ? '今日' : r === 'week' ? '本周' : '本月'}
+              {r === 'today' ? '今日' : r === 'week' ? '本周' : r === 'month' ? '本月' : '总计'}
             </button>
           ))}
         </div>
@@ -926,7 +927,7 @@ function AdminLoginDialog({ isOpen, onLogin, onClose }: { isOpen: boolean; onLog
 
 // 管理控制台组件
 function AdminView({ onLogout }: { onLogout: () => void }) {
-  const [activeTab, setActiveTab] = useState<'pending' | 'logs' | 'newlogs' | 'expert' | 'weekly-picks'>('pending')
+  const [activeTab, setActiveTab] = useState<'pending' | 'logs' | 'newlogs' | 'expert' | 'weekly-picks' | 'webhook'>('pending')
   const [pendingSkills, setPendingSkills] = useState<Skill[]>([])
   const [pendingVersions, setPendingVersions] = useState<any[]>([])
   const [logs, setLogs] = useState<AuditLog[]>([])
@@ -1001,6 +1002,7 @@ function AdminView({ onLogout }: { onLogout: () => void }) {
         <button onClick={() => setActiveTab('newlogs')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'newlogs' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>📊 新日志系统</button>
         <button onClick={() => setActiveTab('expert')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'expert' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>👨‍💼 专家评审</button>
         <button onClick={() => setActiveTab('weekly-picks')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'weekly-picks' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>⭐ 小智优选</button>
+        <button onClick={() => setActiveTab('webhook')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'webhook' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>🔗 Webhook日志</button>
       </div>
 
       {isLoading && <div className="text-center py-12"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500 mx-auto"></div></div>}
@@ -1161,6 +1163,9 @@ function AdminView({ onLogout }: { onLogout: () => void }) {
       )}
       {activeTab === 'weekly-picks' && (
         <WeeklyPicksManager />
+      )}
+      {activeTab === 'webhook' && (
+        <WebhookLogView token={token} />
       )}
       {editingSkill && (
         <编辑SkillDialog
@@ -1351,7 +1356,7 @@ function SimpleSkillCard({ skill, onClick, onDelete }: { skill: Skill; onClick: 
 
 // Main App
 export function SimpleApp() {
-  const [currentView, setCurrentView] = useState<'start' | 'home' | 'publish' | 'detail' | 'stats' | 'admin' | 'webhook' | 'arena' | 'quickstart'>('start')
+  const [currentView, setCurrentView] = useState<'start' | 'home' | 'publish' | 'detail' | 'stats' | 'admin' | 'webhook' | 'arena' | 'quickstart' | 'scenarios'>('start')
   const [skills, setSkills] = useState<Skill[]>([])
   const [selectedSkill, setSelectedSkill] = useState<SkillDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -1543,14 +1548,6 @@ export function SimpleApp() {
     setCurrentView('home')
   }
 
-  function handleWebhookClick() {
-    if (adminToken) {
-      setCurrentView('webhook')
-    } else {
-      setShowAdminLogin(true)
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-[60]">
@@ -1569,10 +1566,10 @@ export function SimpleApp() {
             
             {/* 中间：导航栏目 */}
             <nav className="hidden sm:flex items-center gap-1">
-              {[{ key: 'start', label: '开始' }, { key: 'home', label: '浏览' }, { key: 'publish', label: '发布' }, { key: 'arena', label: 'Skill擂台' }, { key: 'quickstart', label: '速成地图' }, { key: 'stats', label: '展示' }, { key: 'admin', label: '上线与管理' }, { key: 'webhook', label: 'Webhook日志' }].map((item) => (
-                <button 
-                  key={item.key} 
-                  onClick={() => item.key === 'admin' ? handleAdminClick() : item.key === 'webhook' ? handleWebhookClick() : setCurrentView(item.key as any)} 
+              {[{ key: 'start', label: '开始' }, { key: 'home', label: '浏览' }, { key: 'publish', label: '发布' }, { key: 'arena', label: 'Skill擂台' }, { key: 'quickstart', label: '速成与标准' }, { key: 'scenarios', label: '场景地图' }, { key: 'stats', label: '展示' }, { key: 'admin', label: '上线与管理' }].map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => item.key === 'admin' ? handleAdminClick() : setCurrentView(item.key as any)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${currentView === item.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
                 >
                   {item.label}
@@ -1585,8 +1582,8 @@ export function SimpleApp() {
             
             {/* 移动端下拉 */}
             <div className="sm:hidden">
-              <select value={currentView} onChange={(e) => { const v = e.target.value; v === 'admin' ? handleAdminClick() : v === 'webhook' ? handleWebhookClick() : setCurrentView(v as any) }} className="bg-gray-100 border-0 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-pink-500">
-                <option value="start">首页</option><option value="home">浏览</option><option value="publish">发布</option><option value="arena">Skill擂台</option><option value="quickstart">速成地图</option><option value="stats">展示</option><option value="admin">上线与管理</option><option value="webhook">Webhook日志</option>
+                <select value={currentView} onChange={(e) => { const v = e.target.value; v === 'admin' ? handleAdminClick() : setCurrentView(v as any) }} className="bg-gray-100 border-0 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-pink-500">
+                <option value="start">首页</option><option value="home">浏览</option><option value="publish">发布</option><option value="arena">Skill擂台</option><option value="quickstart">速成与标准</option><option value="scenarios">场景地图</option><option value="stats">展示</option><option value="admin">上线与管理</option>
               </select>
             </div>
           </div>
@@ -1674,11 +1671,7 @@ export function SimpleApp() {
             <AdminView onLogout={handleAdminLogout} />
           </div>
         )}
-        {currentView === 'webhook' && adminToken && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <WebhookLogView token={adminToken} />
-          </div>
-        )}
+
         {currentView === 'arena' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <ArenaPage />
@@ -1686,6 +1679,9 @@ export function SimpleApp() {
         )}
         {currentView === 'quickstart' && (
           <QuickStartPage />
+        )}
+        {currentView === 'scenarios' && (
+          <ScenarioMapPage />
         )}
       </main>
 

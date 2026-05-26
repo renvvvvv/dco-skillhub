@@ -45,15 +45,42 @@ export function ScenarioMapTab({
     }
   }
 
+  const [showPreview, setShowPreview] = useState(false)
+
   return (
     <div className="space-y-6">
       {/* 场景地图列表 */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-bold">场景地图 ({scenarios.length})</h3>
-        <Button onClick={() => setIsCreating(true)} size="sm">
-          + 新建场景
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowPreview(!showPreview)}
+          >
+            {showPreview ? '📋 列表视图' : '🎨 预览视图'}
+          </Button>
+          <Button onClick={() => setIsCreating(true)} size="sm">
+            + 新建场景
+          </Button>
+        </div>
       </div>
+
+      {/* HTML预览视图 */}
+      {showPreview && (
+        <div className="w-full" style={{ height: '800px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+          <iframe
+            src="/vnet-template/index.html"
+            style={{ width: '100%', height: '100%', border: 'none' }}
+            title="VNet运维技能场景地图"
+          />
+        </div>
+      )}
+
+      {/* 列表视图 */}
+      {!showPreview && (
+        <>
+      {/* 原有列表内容 */}
 
       {isCreating && (
         <Card className="border-dashed border-2">
@@ -209,6 +236,8 @@ export function ScenarioMapTab({
           }}
           onClose={() => setEditingSkill(null)}
         />
+      )}
+        </>
       )}
     </div>
   )

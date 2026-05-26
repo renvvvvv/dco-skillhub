@@ -991,19 +991,44 @@ def record_view(slug: str, request: Request):
 
 @app.get("/api/stats")
 def get_stats():
-    """返回统计数据（下载量、浏览量、部门上传量、个人上传量）"""
-    skills_data = skills_db.read()
-    views_data = views_db.read()
-    skills = skills_data.get("skills", [])
-    views_map = views_data.get("views", {})
+    """返回统计数据（下载量、浏览量、部门上传量、个人上传量）
 
-    # 技能下载/浏览排行
+    下载量和浏览量从事件日志实时统计，确保数据准确性
+    """
+    skills_data = skills_db.read()
+    skills = skills_data.get("skills", [])
+
+    # 从事件日志统计下载和浏览数据（只读，不修改日志）
+    from app.events import get_events_range
+
+    # 获取所有事件日志中的下载和浏览数据
+    skill_downloads = Counter()
+    skill_views = Counter()
+
+    # 读取所有日期的事件
+    from app.events import get_event_dates
+
+    event_dates = get_event_dates()
+
+    for date in event_dates:
+        events = get_events_range(date, date)
+        for event in events:
+            if event.get("type") == "skill.download":
+                slug = event.get("metadata", {}).get("slug", "")
+                if slug:
+                    skill_downloads[slug] += 1
+            elif event.get("type") == "skill.view":
+                slug = event.get("metadata", {}).get("slug", "")
+                if slug:
+                    skill_views[slug] += 1
+
+    # 技能下载/浏览排行（使用日志数据）
     skill_stats = [
         {
             "name": s.get("name", ""),
             "slug": s["slug"],
-            "downloads": s.get("download_count", 0),
-            "views": views_map.get(s["slug"], 0),
+            "downloads": skill_downloads.get(s["slug"], 0),
+            "views": skill_views.get(s["slug"], 0),
         }
         for s in skills
     ]
@@ -1101,14 +1126,93 @@ def get_stats():
 
 @app.get("/api/stats/kpi")
 def get_kpi():
-    """获取KPI汇总卡片数据（今日/昨日/本周/本月）"""
-    try:
-        # 确保今日数据已聚合
-        today = get_beijing_date()
-        if not get_daily_metrics(today):
-            aggregate_daily(today)
+    """获取KPI汇总卡片数据（今日/昨日/本周/本月/总计）
 
-        kpi = get_kpi_summary()
+    直接从原始事件日志计算，确保数据准确性
+    """
+    try:
+        from app.events import get_events_range, get_event_dates
+        from collections import Counter
+
+        today = get_beijing_date()
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+        month_ago = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+
+        # 获取所有事件日期
+        event_dates = get_event_dates()
+
+        # 初始化统计
+        def calc_stats(start_date, end_date):
+            """计算指定日期范围的统计"""
+            events = []
+            for date_str in event_dates:
+                if start_date <= date_str <= end_date:
+                    events.extend(get_events_range(date_str, date_str))
+
+            downloads = 0
+            views = 0
+            publishes = 0
+            searches = 0
+            unique_users = set()
+            unique_ips = set()
+
+            for event in events:
+                user = event.get("user", "")
+                ip = event.get("ip", "")
+                etype = event.get("type")
+
+                if user:
+                    unique_users.add(user)
+                if ip:
+                    unique_ips.add(ip)
+
+                if etype == "skill.download":
+                    downloads += 1
+                elif etype == "skill.view":
+                    views += 1
+                elif etype == "skill.publish":
+                    publishes += 1
+                elif etype == "search":
+                    searches += 1
+
+            return {
+                "skills_total": publishes,
+                "downloads": downloads,
+                "views": views,
+                "searches": searches,
+                "unique_users": len(unique_users),
+            }
+
+        # 计算各时间段
+        today_stats = calc_stats(today, today)
+        yesterday_stats = calc_stats(yesterday, yesterday)
+        week_stats = calc_stats(week_ago, today)
+        month_stats = calc_stats(month_ago, today)
+
+        # 计算总计（所有时间）
+        if event_dates:
+            total_stats = calc_stats(min(event_dates), max(event_dates))
+            # 总计中的技能总数使用系统中当前的有效技能数（而不是发布事件数）
+            skills_data = skills_db.read()
+            total_stats["skills_total"] = len(skills_data.get("skills", []))
+        else:
+            total_stats = {
+                "skills_total": 0,
+                "downloads": 0,
+                "views": 0,
+                "searches": 0,
+                "unique_users": 0,
+            }
+
+        kpi = {
+            "today": today_stats,
+            "yesterday": yesterday_stats,
+            "this_week": week_stats,
+            "this_month": month_stats,
+            "total": total_stats,
+        }
+
         return {"success": True, "data": kpi}
     except Exception as e:
         return {"success": False, "message": str(e)}
