@@ -522,6 +522,70 @@ export async function getCombinedRankings(
   return response.json();
 }
 
+// ========== 运营数据分析 API ==========
+
+export async function getAnalyticsOverview(startDate: string, endDate: string): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/analytics/overview?start_date=${startDate}&end_date=${endDate}`);
+  if (!response.ok) throw new Error('Failed to get analytics overview');
+  return response.json();
+}
+
+export async function getAnalyticsTrend(startDate: string, endDate: string): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/analytics/trend?start_date=${startDate}&end_date=${endDate}`);
+  if (!response.ok) throw new Error('Failed to get analytics trend');
+  return response.json();
+}
+
+export async function getAnalyticsSkills(startDate: string, endDate: string, sortBy: string = 'downloads', limit: number = 10): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/analytics/skills?start_date=${startDate}&end_date=${endDate}&sort_by=${sortBy}&limit=${limit}`);
+  if (!response.ok) throw new Error('Failed to get analytics skills');
+  return response.json();
+}
+
+export async function getAnalyticsSearch(startDate: string, endDate: string): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/analytics/search?start_date=${startDate}&end_date=${endDate}`);
+  if (!response.ok) throw new Error('Failed to get analytics search');
+  return response.json();
+}
+
+export async function getAnalyticsHeatmap(startDate: string, endDate: string, metric: string = 'downloads'): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/analytics/heatmap?start_date=${startDate}&end_date=${endDate}&metric=${metric}`);
+  if (!response.ok) throw new Error('Failed to get analytics heatmap');
+  return response.json();
+}
+
+export async function getAnalyticsDayDetail(date: string, metric: string = 'downloads'): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/analytics/day-detail?date=${date}&metric=${metric}`);
+  if (!response.ok) throw new Error('Failed to get analytics day detail');
+  return response.json();
+}
+
+// ========== 评奖数据 API（排除数智中心）==========
+
+export async function getRankingDepartments(metric: string = 'composite', limit: number = 10): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/rankings/departments?metric=${metric}&limit=${limit}`);
+  if (!response.ok) throw new Error('Failed to get department rankings');
+  return response.json();
+}
+
+export async function getRankingDevelopers(metric: string = 'composite', limit: number = 10): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/rankings/developers?metric=${metric}&limit=${limit}`);
+  if (!response.ok) throw new Error('Failed to get developer rankings');
+  return response.json();
+}
+
+export async function getRankingCenters(metric: string = 'composite'): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/rankings/centers?metric=${metric}`);
+  if (!response.ok) throw new Error('Failed to get center rankings');
+  return response.json();
+}
+
+export async function getRankingRegions(metric: string = 'publishes'): Promise<ApiResponse<any>> {
+  const response = await fetch(`${API_BASE}/rankings/regions?metric=${metric}`);
+  if (!response.ok) throw new Error('Failed to get region rankings');
+  return response.json();
+}
+
 // 获取用户ID（基于IP的简单标识）
 function getUserId(): string {
   // 尝试从localStorage获取

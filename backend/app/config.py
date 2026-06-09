@@ -54,8 +54,8 @@ FEISHU_WEBHOOK_URL_EXTERNAL = os.getenv(
 FEISHU_WEBHOOK_SECRET_EXTERNAL = os.getenv("FEISHU_WEBHOOK_SECRET_EXTERNAL", "")
 
 # 通知开关
-ENABLE_DAILY_REPORT = os.getenv("ENABLE_DAILY_REPORT", "true").lower() == "true"
-ENABLE_WEEKLY_REPORT = os.getenv("ENABLE_WEEKLY_REPORT", "true").lower() == "true"
+ENABLE_DAILY_REPORT = os.getenv("ENABLE_DAILY_REPORT", "false").lower() == "true"
+ENABLE_WEEKLY_REPORT = os.getenv("ENABLE_WEEKLY_REPORT", "false").lower() == "true"
 ENABLE_PENDING_ALERT = os.getenv("ENABLE_PENDING_ALERT", "true").lower() == "true"
 
 # 技能申请通知开关
@@ -126,6 +126,14 @@ METRIC_STANDARDS = {
 HISTORY_VERSION_PASSWORD = os.getenv(
     "HISTORY_VERSION_PASSWORD", "skillhub-history-2026"
 )
+
+# IP黑名单（机器人/爬虫过滤）
+BLOCKED_IPS = {
+    "111.56.183.77",
+    "60.31.150.220",
+    "39.154.197.229",
+    "106.35.221.81",
+}
 
 # 应用配置
 APP_NAME = "随航守卫"

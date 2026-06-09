@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from collections import Counter, defaultdict
 
-from app.config import METRICS_DAILY_FILE, METRICS_HOURLY_FILE
+from app.config import METRICS_DAILY_FILE, METRICS_HOURLY_FILE, BLOCKED_IPS
 from app.database import JSONDatabase
 from app.events import get_events, get_event_dates
 from app.org_mapping import get_idc_info
@@ -58,6 +58,11 @@ def aggregate_daily(date: str = None) -> dict:
     for event in events:
         user = event.get("user", "")
         ip = event.get("ip", "")
+
+        # 跳过黑名单IP的事件
+        if ip in BLOCKED_IPS:
+            continue
+
         meta = event.get("metadata", {})
 
         if user:

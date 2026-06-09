@@ -6,7 +6,33 @@ from typing import Dict, List, Optional
 
 from app.metrics import get_kpi_summary, get_daily_metrics, get_metrics_range
 from app.database import skills_db, views_db
-from app.events import get_events
+from app.events import get_events, get_events_range, get_event_dates
+from app.config import BLOCKED_IPS
+from collections import Counter
+
+
+def _get_filtered_stats():
+    """从事件日志获取过滤后的下载量和浏览量统计"""
+    skill_downloads = Counter()
+    skill_views = Counter()
+
+    event_dates = get_event_dates()
+    for date in event_dates:
+        events = get_events_range(date, date)
+        for event in events:
+            ip = event.get("ip", "")
+            if ip in BLOCKED_IPS:
+                continue
+            etype = event.get("type")
+            slug = event.get("metadata", {}).get("slug", "")
+            if not slug:
+                continue
+            if etype == "skill.download":
+                skill_downloads[slug] += 1
+            elif etype == "skill.view":
+                skill_views[slug] += 1
+
+    return skill_downloads, skill_views
 
 
 def _calc_trend(current: int, previous: int) -> dict:
@@ -58,6 +84,10 @@ class DailyReportBuilder:
         yesterday_users = set()
 
         for event in events:
+            # 跳过黑名单IP的事件
+            if event.get("ip", "") in BLOCKED_IPS:
+                continue
+
             etype = event.get("type", "")
             if etype == "skill.view":
                 yesterday_views += 1
@@ -113,24 +143,27 @@ class DailyReportBuilder:
         skills = skills_data.get("skills", [])
         views_map = views_data.get("views", {})
 
-        # 按下载量排序
+        # 获取过滤后的统计数据
+        skill_downloads, skill_views = _get_filtered_stats()
+
+        # 按下载量排序（使用过滤后的数据）
         skill_stats = [
             {
                 "name": s.get("name", ""),
                 "slug": s["slug"],
-                "downloads": s.get("download_count", 0),
-                "views": views_map.get(s["slug"], 0),
+                "downloads": skill_downloads.get(s["slug"], 0),
+                "views": skill_views.get(s["slug"], 0),
                 "author": s.get("author_name", ""),
             }
             for s in skills
         ]
         skill_stats.sort(key=lambda x: x["downloads"], reverse=True)
 
-        # 获取技能总量、总访问量、总下载量、总发布量
+        # 获取技能总量、总访问量、总下载量、总发布量（使用过滤后的数据）
         all_skills = skills_db.read().get("skills", [])
         total_skills = len(all_skills)
-        total_views = sum(views_map.get(s["slug"], 0) for s in all_skills)
-        total_downloads = sum(s.get("download_count", 0) or 0 for s in all_skills)
+        total_views = sum(skill_views.get(s["slug"], 0) for s in all_skills)
+        total_downloads = sum(skill_downloads.get(s["slug"], 0) for s in all_skills)
         total_publishes = len([s for s in all_skills if s.get("status") == "approved"])
 
         return {
@@ -265,6 +298,9 @@ class WeeklyReportBuilder:
                     "skills": [],
                 }
 
+        # 获取过滤后的统计数据
+        skill_downloads, skill_views = _get_filtered_stats()
+
         # 统计所有技能数据
         for s in skills:
             dept = s.get("author_department", "")
@@ -276,22 +312,18 @@ class WeeklyReportBuilder:
             if region_id and region_id != "hq" and region_id in combined_stats:
                 combined_stats[region_id]["publishes"] += 1
                 combined_stats[region_id]["downloads"] += int(
-                    s.get("download_count", 0) or 0
+                    skill_downloads.get(s["slug"], 0)
                 )
-                combined_stats[region_id]["views"] += int(
-                    views_map.get(s["slug"], 0) or 0
-                )
+                combined_stats[region_id]["views"] += int(skill_views.get(s["slug"], 0))
                 combined_stats[region_id]["skills"].append(s.get("name"))
 
             # 统计到职能中心（排除数智中心）
             if center_id and center_id != "hq-数智" and center_id in combined_stats:
                 combined_stats[center_id]["publishes"] += 1
                 combined_stats[center_id]["downloads"] += int(
-                    s.get("download_count", 0) or 0
+                    skill_downloads.get(s["slug"], 0)
                 )
-                combined_stats[center_id]["views"] += int(
-                    views_map.get(s["slug"], 0) or 0
-                )
+                combined_stats[center_id]["views"] += int(skill_views.get(s["slug"], 0))
                 combined_stats[center_id]["skills"].append(s.get("name"))
 
         # 转换为列表并排序
@@ -309,8 +341,8 @@ class WeeklyReportBuilder:
             if dept not in dept_stats:
                 dept_stats[dept] = {"publishes": 0, "downloads": 0, "views": 0}
             dept_stats[dept]["publishes"] += 1
-            dept_stats[dept]["downloads"] += int(s.get("download_count", 0) or 0)
-            dept_stats[dept]["views"] += int(views_map.get(s["slug"], 0) or 0)
+            dept_stats[dept]["downloads"] += int(skill_downloads.get(s["slug"], 0))
+            dept_stats[dept]["views"] += int(skill_views.get(s["slug"], 0))
 
         # 计算部门综合评分
         top_departments = []
@@ -341,8 +373,8 @@ class WeeklyReportBuilder:
                     "department": "",
                 }
             author_stats[author]["publishes"] += 1
-            author_stats[author]["downloads"] += int(s.get("download_count", 0) or 0)
-            author_stats[author]["views"] += int(views_map.get(s["slug"], 0) or 0)
+            author_stats[author]["downloads"] += int(skill_downloads.get(s["slug"], 0))
+            author_stats[author]["views"] += int(skill_views.get(s["slug"], 0))
             if not author_stats[author]["department"]:
                 author_stats[author]["department"] = s.get("author_department", "")
 
@@ -364,11 +396,11 @@ class WeeklyReportBuilder:
             )
         top_skills.sort(key=lambda x: x["composite_score"], reverse=True)
 
-        # 获取技能总量、总访问量、总下载量、总发布量
+        # 获取技能总量、总访问量、总下载量、总发布量（使用过滤后的数据）
         all_skills = skills_db.read().get("skills", [])
         total_skills = len(all_skills)
-        total_views = sum(views_map.get(s["slug"], 0) for s in all_skills)
-        total_downloads = sum(s.get("download_count", 0) or 0 for s in all_skills)
+        total_views = sum(skill_views.get(s["slug"], 0) for s in all_skills)
+        total_downloads = sum(skill_downloads.get(s["slug"], 0) for s in all_skills)
         total_publishes = len([s for s in all_skills if s.get("status") == "approved"])
 
         # 计算数据质量指标

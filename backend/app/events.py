@@ -2,6 +2,7 @@
 
 记录所有用户行为事件，按日期分片存储，支持后续聚合分析。
 """
+
 import json
 import uuid
 from pathlib import Path
@@ -9,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from collections import Counter
 
-from app.config import EVENTS_DIR, SEARCH_LOGS_FILE
+from app.config import EVENTS_DIR, SEARCH_LOGS_FILE, BLOCKED_IPS
 from app.database import JSONDatabase
 
 
@@ -30,22 +31,23 @@ def _get_event_db() -> JSONDatabase:
 
 
 def track_event(
-    event_type: str,
-    user: str = "",
-    ip: str = "",
-    metadata: dict = None
+    event_type: str, user: str = "", ip: str = "", metadata: dict = None
 ) -> dict:
     """记录一个事件
-    
+
     Args:
         event_type: 事件类型，如 skill.view, skill.download, search, page.view 等
         user: 用户标识（姓名或ID）
         ip: 用户IP
         metadata: 事件附加数据
-        
+
     Returns:
-        记录的事件对象
+        记录的事件对象（如果IP被拉黑则返回空字典）
     """
+    # 过滤黑名单IP
+    if ip in BLOCKED_IPS:
+        return {}
+
     event = {
         "id": str(uuid.uuid4()),
         "type": event_type,
@@ -54,16 +56,19 @@ def track_event(
         "timestamp": datetime.now().isoformat(),
         "metadata": metadata or {},
     }
-    
+
     db = _get_event_db()
     db.update(lambda data: data["events"].append(event))
-    
+
     return event
 
 
 # ========== 便捷封装函数 ==========
 
-def track_skill_view(slug: str, skill_name: str, user: str = "", ip: str = "", source_page: str = ""):
+
+def track_skill_view(
+    slug: str, skill_name: str, user: str = "", ip: str = "", source_page: str = ""
+):
     """记录技能浏览事件"""
     return track_event(
         "skill.view",
@@ -73,11 +78,13 @@ def track_skill_view(slug: str, skill_name: str, user: str = "", ip: str = "", s
             "slug": slug,
             "skill_name": skill_name,
             "source_page": source_page,
-        }
+        },
     )
 
 
-def track_skill_download(slug: str, skill_name: str, version: str, user: str = "", ip: str = ""):
+def track_skill_download(
+    slug: str, skill_name: str, version: str, user: str = "", ip: str = ""
+):
     """记录技能下载事件"""
     return track_event(
         "skill.download",
@@ -87,11 +94,13 @@ def track_skill_download(slug: str, skill_name: str, version: str, user: str = "
             "slug": slug,
             "skill_name": skill_name,
             "version": version,
-        }
+        },
     )
 
 
-def track_search(query: str, results_count: int, user: str = "", ip: str = "", clicked_slug: str = ""):
+def track_search(
+    query: str, results_count: int, user: str = "", ip: str = "", clicked_slug: str = ""
+):
     """记录搜索事件"""
     return track_event(
         "search",
@@ -102,11 +111,13 @@ def track_search(query: str, results_count: int, user: str = "", ip: str = "", c
             "results_count": results_count,
             "clicked_slug": clicked_slug,
             "has_results": results_count > 0,
-        }
+        },
     )
 
 
-def track_skill_publish(slug: str, skill_name: str, author: str, tags: list = None, file_size: int = 0):
+def track_skill_publish(
+    slug: str, skill_name: str, author: str, tags: list = None, file_size: int = 0
+):
     """记录技能发布事件"""
     return track_event(
         "skill.publish",
@@ -116,7 +127,7 @@ def track_skill_publish(slug: str, skill_name: str, author: str, tags: list = No
             "skill_name": skill_name,
             "tags": tags or [],
             "file_size": file_size,
-        }
+        },
     )
 
 
@@ -129,7 +140,7 @@ def track_tag_click(tag_name: str, source: str = "", user: str = "", ip: str = "
         metadata={
             "tag_name": tag_name,
             "source": source,
-        }
+        },
     )
 
 
@@ -142,11 +153,13 @@ def track_page_view(page_name: str, user: str = "", ip: str = "", duration_ms: i
         metadata={
             "page_name": page_name,
             "duration_ms": duration_ms,
-        }
+        },
     )
 
 
-def track_admin_action(action: str, slug: str, skill_name: str, admin_user: str = "", reason: str = ""):
+def track_admin_action(
+    action: str, slug: str, skill_name: str, admin_user: str = "", reason: str = ""
+):
     """记录管理员操作事件"""
     return track_event(
         "admin.action",
@@ -156,20 +169,18 @@ def track_admin_action(action: str, slug: str, skill_name: str, admin_user: str 
             "slug": slug,
             "skill_name": skill_name,
             "reason": reason,
-        }
+        },
     )
 
 
 # ========== 事件查询 ==========
 
+
 def get_events(
-    date: str = None,
-    event_type: str = None,
-    user: str = None,
-    limit: int = 100
+    date: str = None, event_type: str = None, user: str = None, limit: int = 100
 ) -> List[dict]:
     """查询事件
-    
+
     Args:
         date: 日期字符串 "YYYY-MM-DD"，默认今天
         event_type: 事件类型过滤
@@ -178,33 +189,35 @@ def get_events(
     """
     if date is None:
         date = datetime.now().strftime("%Y-%m-%d")
-    
+
     file_path = EVENTS_DIR / f"{date}.json"
     if not file_path.exists():
         return []
-    
+
     try:
         data = json.loads(file_path.read_text(encoding="utf-8"))
         events = data.get("events", [])
     except (json.JSONDecodeError, FileNotFoundError):
         return []
-    
+
     # 过滤
     if event_type:
         events = [e for e in events if e["type"] == event_type]
     if user:
         events = [e for e in events if e["user"] == user]
-    
+
     # 按时间倒序，限制条数
     events.sort(key=lambda x: x["timestamp"], reverse=True)
     return events[:limit]
 
 
-def get_events_range(start_date: str, end_date: str, event_type: str = None) -> List[dict]:
+def get_events_range(
+    start_date: str, end_date: str, event_type: str = None
+) -> List[dict]:
     """查询日期范围内的事件"""
     start = datetime.strptime(start_date, "%Y-%m-%d")
     end = datetime.strptime(end_date, "%Y-%m-%d")
-    
+
     all_events = []
     current = start
     while current <= end:
@@ -212,7 +225,7 @@ def get_events_range(start_date: str, end_date: str, event_type: str = None) -> 
         events = get_events(date_str, event_type=event_type, limit=10000)
         all_events.extend(events)
         current += timedelta(days=1)
-    
+
     all_events.sort(key=lambda x: x["timestamp"], reverse=True)
     return all_events
 

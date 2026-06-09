@@ -23,6 +23,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
+      - ENABLE_DAILY_REPORT=false
+      - ENABLE_WEEKLY_REPORT=false
     dns:
       - 8.8.8.8
       - 114.114.114.114

@@ -34,68 +34,248 @@ IDC_DATACENTERS = {
     # 华北一区 (hb1) - 11个
     "hb1-hb1": {"name": "HB1（北京B28数据中心）", "region_id": "hb1", "short": "HB1"},
     "hb1-hb5": {"name": "HB5（北京M3数据中心）", "region_id": "hb1", "short": "HB5"},
-    "hb1-hbdw1": {"name": "HBDW1（北京M5数据中心）", "region_id": "hb1", "short": "HBDW1"},
+    "hb1-hbdw1": {
+        "name": "HBDW1（北京M5数据中心）",
+        "region_id": "hb1",
+        "short": "HBDW1",
+    },
     "hb1-hb4": {"name": "HB4（北京M6V数据中心）", "region_id": "hb1", "short": "HB4"},
     "hb1-hb3": {"name": "HB3（北京M6数据中心）", "region_id": "hb1", "short": "HB3"},
-    "hb1-hbdw2": {"name": "HBDW2（北京海淀联通五棵松数据中心）", "region_id": "hb1", "short": "HBDW2"},
-    "hb1-hb6": {"name": "HB6（北京顺义腾仁数据中心）", "region_id": "hb1", "short": "HB6"},
-    "hb1-hb25": {"name": "HB25（河北怀来基地数据中心）", "region_id": "hb1", "short": "HB25"},
-    "hb1-hbdw3": {"name": "HBDW3（泰康保险数据中心）", "region_id": "hb1", "short": "HBDW3"},
-    "hb1-hb22": {"name": "HB22（陕西西安凤竹数据中心）", "region_id": "hb1", "short": "HB22"},
-    "hb1-hb7": {"name": "HB7（陕西西安经开数据中心）", "region_id": "hb1", "short": "HB7"},
+    "hb1-hbdw2": {
+        "name": "HBDW2（北京海淀联通五棵松数据中心）",
+        "region_id": "hb1",
+        "short": "HBDW2",
+    },
+    "hb1-hb6": {
+        "name": "HB6（北京顺义腾仁数据中心）",
+        "region_id": "hb1",
+        "short": "HB6",
+    },
+    "hb1-hb25": {
+        "name": "HB25（河北怀来基地数据中心）",
+        "region_id": "hb1",
+        "short": "HB25",
+    },
+    "hb1-hbdw3": {
+        "name": "HBDW3（泰康保险数据中心）",
+        "region_id": "hb1",
+        "short": "HBDW3",
+    },
+    "hb1-hb22": {
+        "name": "HB22（陕西西安凤竹数据中心）",
+        "region_id": "hb1",
+        "short": "HB22",
+    },
+    "hb1-hb7": {
+        "name": "HB7（陕西西安经开数据中心）",
+        "region_id": "hb1",
+        "short": "HB7",
+    },
     # 华北二区 (hb2) - 7个
-    "hb2-hb15": {"name": "HB15（三河铭泰数据中心）", "region_id": "hb2", "short": "HB15"},
-    "hb2-hb21": {"name": "HB21（北京东部数据中心）", "region_id": "hb2", "short": "HB21"},
-    "hb2-hb11": {"name": "HB11（北京亦庄博兴数据中心）", "region_id": "hb2", "short": "HB11"},
-    "hb2-hb10": {"name": "HB10（北京亦庄同济中路数据中心）", "region_id": "hb2", "short": "HB10"},
-    "hb2-hb12": {"name": "HB12（北京大兴星光影视城数据中心）", "region_id": "hb2", "short": "HB12"},
-    "hb2-hb13": {"name": "HB13（北京通州马驹桥数据中心）", "region_id": "hb2", "short": "HB13"},
-    "hb2-hbdw4": {"name": "HBDW4（河北廊坊高新互联数据中心）", "region_id": "hb2", "short": "HBDW4"},
+    "hb2-hb15": {
+        "name": "HB15（三河铭泰数据中心）",
+        "region_id": "hb2",
+        "short": "HB15",
+    },
+    "hb2-hb21": {
+        "name": "HB21（北京东部数据中心）",
+        "region_id": "hb2",
+        "short": "HB21",
+    },
+    "hb2-hb11": {
+        "name": "HB11（北京亦庄博兴数据中心）",
+        "region_id": "hb2",
+        "short": "HB11",
+    },
+    "hb2-hb10": {
+        "name": "HB10（北京亦庄同济中路数据中心）",
+        "region_id": "hb2",
+        "short": "HB10",
+    },
+    "hb2-hb12": {
+        "name": "HB12（北京大兴星光影视城数据中心）",
+        "region_id": "hb2",
+        "short": "HB12",
+    },
+    "hb2-hb13": {
+        "name": "HB13（北京通州马驹桥数据中心）",
+        "region_id": "hb2",
+        "short": "HB13",
+    },
+    "hb2-hbdw4": {
+        "name": "HBDW4（河北廊坊高新互联数据中心）",
+        "region_id": "hb2",
+        "short": "HBDW4",
+    },
     # 华北三区 (hb3) - 6个
-    "hb3-hbdw5": {"name": "HBDW5（乌兰1号基地数据中心）", "region_id": "hb3", "short": "HBDW5"},
-    "hb3-hbdw6": {"name": "HBDW6（乌兰2号基地数据中心）", "region_id": "hb3", "short": "HBDW6"},
-    "hb3-hb19": {"name": "HB19（乌兰3号基地数据中心）", "region_id": "hb3", "short": "HB19"},
-    "hb3-hb20": {"name": "HB20（乌兰4号基地数据中心）", "region_id": "hb3", "short": "HB20"},
-    "hb3-hbdw7": {"name": "HBDW7（乌兰5号基地数据中心）", "region_id": "hb3", "short": "HBDW7"},
-    "hb3-hb24": {"name": "HB24（乌兰6号基地数据中心）", "region_id": "hb3", "short": "HB24"},
+    "hb3-hbdw5": {
+        "name": "HBDW5（乌兰1号基地数据中心）",
+        "region_id": "hb3",
+        "short": "HBDW5",
+    },
+    "hb3-hbdw6": {
+        "name": "HBDW6（乌兰2号基地数据中心）",
+        "region_id": "hb3",
+        "short": "HBDW6",
+    },
+    "hb3-hb19": {
+        "name": "HB19（乌兰3号基地数据中心）",
+        "region_id": "hb3",
+        "short": "HB19",
+    },
+    "hb3-hb20": {
+        "name": "HB20（乌兰4号基地数据中心）",
+        "region_id": "hb3",
+        "short": "HB20",
+    },
+    "hb3-hbdw7": {
+        "name": "HBDW7（乌兰5号基地数据中心）",
+        "region_id": "hb3",
+        "short": "HBDW7",
+    },
+    "hb3-hb24": {
+        "name": "HB24（乌兰6号基地数据中心）",
+        "region_id": "hb3",
+        "short": "HB24",
+    },
     # 华东一区 (hd1) - 11个
-    "hd1-hd4": {"name": "HD4（上海外高桥数据中心）", "region_id": "hd1", "short": "HD4"},
+    "hd1-hd4": {
+        "name": "HD4（上海外高桥数据中心）",
+        "region_id": "hd1",
+        "short": "HD4",
+    },
     "hd1-hd3": {"name": "HD3（上海松江数据中心）", "region_id": "hd1", "short": "HD3"},
-    "hd1-hddw1": {"name": "HDDW1（上海磐石智算数据中心）", "region_id": "hd1", "short": "HDDW1"},
+    "hd1-hddw1": {
+        "name": "HDDW1（上海磐石智算数据中心）",
+        "region_id": "hd1",
+        "short": "HDDW1",
+    },
     "hd1-hd1": {"name": "HD1（上海纪蕴数据中心）", "region_id": "hd1", "short": "HD1"},
     "hd1-hd6": {"name": "HD6（上海荷丹数据中心）", "region_id": "hd1", "short": "HD6"},
     "hd1-hd5": {"name": "HD5（上海金港数据中心）", "region_id": "hd1", "short": "HD5"},
-    "hd1-hd9": {"name": "HD9（安徽宿州高新区数据中心）", "region_id": "hd1", "short": "HD9"},
-    "hd1-hd8": {"name": "HD8（江苏南通保税区数据中心）", "region_id": "hd1", "short": "HD8"},
-    "hd1-hd15": {"name": "HD15（江苏昆山数据中心）", "region_id": "hd1", "short": "HD15"},
-    "hd1-hd11": {"name": "HD11（浙江杭州下沙数据中心）", "region_id": "hd1", "short": "HD11"},
-    "hd1-hd13": {"name": "HD13（浙江杭州央广云数据中心）", "region_id": "hd1", "short": "HD13"},
+    "hd1-hd9": {
+        "name": "HD9（安徽宿州高新区数据中心）",
+        "region_id": "hd1",
+        "short": "HD9",
+    },
+    "hd1-hd8": {
+        "name": "HD8（江苏南通保税区数据中心）",
+        "region_id": "hd1",
+        "short": "HD8",
+    },
+    "hd1-hd15": {
+        "name": "HD15（江苏昆山数据中心）",
+        "region_id": "hd1",
+        "short": "HD15",
+    },
+    "hd1-hd11": {
+        "name": "HD11（浙江杭州下沙数据中心）",
+        "region_id": "hd1",
+        "short": "HD11",
+    },
+    "hd1-hd13": {
+        "name": "HD13（浙江杭州央广云数据中心）",
+        "region_id": "hd1",
+        "short": "HD13",
+    },
     # 华东二区 (hd2) - 1个
-    "hd2-hd7": {"name": "HD7（江苏太仓基地数据中心）", "region_id": "hd2", "short": "HD7"},
+    "hd2-hd7": {
+        "name": "HD7（江苏太仓基地数据中心）",
+        "region_id": "hd2",
+        "short": "HD7",
+    },
     # 华南区 (hn) - 12个
-    "hn-hn6": {"name": "HN6（四川广元电信数据中心）", "region_id": "hn", "short": "HN6"},
-    "hn-hn8": {"name": "HN8（四川成都双流算力平台数据中心）", "region_id": "hn", "short": "HN8"},
-    "hn-hndw5": {"name": "HNDW5（四川成都天府联通数据中心）", "region_id": "hn", "short": "HNDW5"},
-    "hn-hn5": {"name": "HN5（四川成都棕树数据中心）", "region_id": "hn", "short": "HN5"},
-    "hn-hn4": {"name": "HN4（广东佛山智慧城市数据中心）", "region_id": "hn", "short": "HN4"},
-    "hn-hndw3": {"name": "HNDW3（广东广州亚太信息引擎数据中心）", "region_id": "hn", "short": "HNDW3"},
-    "hn-hndw1": {"name": "HNDW1（广东广州化龙数据中心）", "region_id": "hn", "short": "HNDW1"},
-    "hn-hn3": {"name": "HN3（广东广州科学城连云数据中心）", "region_id": "hn", "short": "HN3"},
-    "hn-hndw4": {"name": "HNDW4（广东深圳盐田明珠数据中心）", "region_id": "hn", "short": "HNDW4"},
-    "hn-hndw2": {"name": "HNDW2（广东深圳盐田武浩数据中心）", "region_id": "hn", "short": "HNDW2"},
-    "hn-hn1": {"name": "HN1（广东深圳花园城数据中心）", "region_id": "hn", "short": "HN1"},
-    "hn-hn2": {"name": "HN2（广东深圳软件基地数据中心）", "region_id": "hn", "short": "HN2"},
+    "hn-hn6": {
+        "name": "HN6（四川广元电信数据中心）",
+        "region_id": "hn",
+        "short": "HN6",
+    },
+    "hn-hn8": {
+        "name": "HN8（四川成都双流算力平台数据中心）",
+        "region_id": "hn",
+        "short": "HN8",
+    },
+    "hn-hndw5": {
+        "name": "HNDW5（四川成都天府联通数据中心）",
+        "region_id": "hn",
+        "short": "HNDW5",
+    },
+    "hn-hn5": {
+        "name": "HN5（四川成都棕树数据中心）",
+        "region_id": "hn",
+        "short": "HN5",
+    },
+    "hn-hn4": {
+        "name": "HN4（广东佛山智慧城市数据中心）",
+        "region_id": "hn",
+        "short": "HN4",
+    },
+    "hn-hndw3": {
+        "name": "HNDW3（广东广州亚太信息引擎数据中心）",
+        "region_id": "hn",
+        "short": "HNDW3",
+    },
+    "hn-hndw1": {
+        "name": "HNDW1（广东广州化龙数据中心）",
+        "region_id": "hn",
+        "short": "HNDW1",
+    },
+    "hn-hn3": {
+        "name": "HN3（广东广州科学城连云数据中心）",
+        "region_id": "hn",
+        "short": "HN3",
+    },
+    "hn-hndw4": {
+        "name": "HNDW4（广东深圳盐田明珠数据中心）",
+        "region_id": "hn",
+        "short": "HNDW4",
+    },
+    "hn-hndw2": {
+        "name": "HNDW2（广东深圳盐田武浩数据中心）",
+        "region_id": "hn",
+        "short": "HNDW2",
+    },
+    "hn-hn1": {
+        "name": "HN1（广东深圳花园城数据中心）",
+        "region_id": "hn",
+        "short": "HN1",
+    },
+    "hn-hn2": {
+        "name": "HN2（广东深圳软件基地数据中心）",
+        "region_id": "hn",
+        "short": "HN2",
+    },
     # 杭钢 (hg) - 1个
-    "hg-hgdw1": {"name": "HGDW1（浙江杭州杭钢云计算数据中心）", "region_id": "hg", "short": "HGDW1"},
+    "hg-hgdw1": {
+        "name": "HGDW1（浙江杭州杭钢云计算数据中心）",
+        "region_id": "hg",
+        "short": "HGDW1",
+    },
     # 香山 (xs) - 1个
     "xs-xs1": {"name": "XS1（北京香山数据中心）", "region_id": "xs", "short": "XS1"},
     # 其他区域 (qt) - 常用映射
-    "qt-qt23": {"name": "QT23（北京朝阳酒仙桥百度M1数据中心）", "region_id": "qt", "short": "QT23"},
-    "qt-qt01": {"name": "QT01（河北廊坊云基地数据中心）", "region_id": "qt", "short": "QT01"},
+    "qt-qt23": {
+        "name": "QT23（北京朝阳酒仙桥百度M1数据中心）",
+        "region_id": "qt",
+        "short": "QT23",
+    },
+    "qt-qt01": {
+        "name": "QT01（河北廊坊云基地数据中心）",
+        "region_id": "qt",
+        "short": "QT01",
+    },
     "qt-qt11": {"name": "QT11（上海静安数据中心）", "region_id": "qt", "short": "QT11"},
-    "qt-qt27-17": {"name": "QT27（江苏苏州国科数据中心）", "region_id": "qt", "short": "QT27"},
+    "qt-qt27-17": {
+        "name": "QT27（江苏苏州国科数据中心）",
+        "region_id": "qt",
+        "short": "QT27",
+    },
     "qt-hb201": {"name": "HB201（乌兰基地）", "region_id": "qt", "short": "HB201"},
-    "qt-hb2": {"name": "HB2（河北廊坊固安数据中心）", "region_id": "qt", "short": "HB2"},
+    "qt-hb2": {
+        "name": "HB2（河北廊坊固安数据中心）",
+        "region_id": "qt",
+        "short": "HB2",
+    },
 }
 
 # ========== 原始部门名 → IDC 标准映射 ==========
@@ -216,6 +396,10 @@ DEPT_TO_IDC = {
     "数智化平台组": ("hq", "hq-数智", "数智中心"),
     "人力资源部": ("hq", "hq-组织", "组织中心"),
     "交付实施组": ("hq", "hq-体系", "体系中心"),
+    "体系中心": ("hq", "hq-体系", "体系中心"),
+    "技术中心": ("hq", "hq-技术", "技术中心"),
+    "测试部门": ("hq", "hq-体系", "体系中心"),
+    "设施运维部": ("hq", "hq-技术", "技术中心"),
     # ===== 区域分部（归入对应区域）=====
     "华东一部": ("hd1", "hd1-hd8", "HD8"),
     "华东二部": ("hd1", "hd1-hd8", "HD8"),
@@ -226,9 +410,10 @@ DEPT_TO_IDC = {
 
 # ========== 辅助函数 ==========
 
+
 def get_idc_info(dept_name: str) -> dict:
     """根据原始部门名获取 IDC 标准信息
-    
+
     Returns:
         {
             "region_id": "",
@@ -255,9 +440,9 @@ def get_idc_info(dept_name: str) -> dict:
             "level": 3,
             "mapped": False,
         }
-    
+
     region_id, node_id, short_name = mapping
-    
+
     if region_id == "hq":
         # 职能中心
         center_info = IDC_CENTERS.get(node_id, {})
@@ -293,7 +478,7 @@ def enrich_staff_record(staff: dict) -> dict:
     """为单条人员记录补充 IDC 标准字段"""
     dept_name = staff.get("department", "")
     idc_info = get_idc_info(dept_name)
-    
+
     # 保留原有字段，添加新字段
     staff["region_id"] = idc_info["region_id"]
     staff["region_name"] = idc_info["region_name"]
@@ -304,7 +489,7 @@ def enrich_staff_record(staff: dict) -> dict:
     staff["center_name"] = idc_info["center_name"]
     staff["level"] = idc_info["level"]
     staff["idc_mapped"] = idc_info["mapped"]
-    
+
     return staff
 
 
@@ -323,12 +508,14 @@ def get_dcs_by_region(region_id: str) -> list:
     dcs = []
     for did, info in IDC_DATACENTERS.items():
         if info.get("region_id") == region_id:
-            dcs.append({
-                "id": did,
-                "name": info["name"],
-                "short": info["short"],
-                "region_id": region_id,
-            })
+            dcs.append(
+                {
+                    "id": did,
+                    "name": info["name"],
+                    "short": info["short"],
+                    "region_id": region_id,
+                }
+            )
     return sorted(dcs, key=lambda x: x["id"])
 
 

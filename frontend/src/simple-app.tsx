@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react'
 import { getSkills, searchSkills, getSkill, publishSkill, updateSkill, deleteSkill, recordView, getStats, getKpi, getTrend, getRealtimeEvents, getSearchAnalysis, adminLogin, getPending, approveSkill, getAuditLogs, trackEvent, getSkillStats, getRegionRankings, getCenterRankings, getCombinedRankings, Skill, SkillDetail, StatsData, KpiData, TrendData, RealtimeEvent, SearchAnalysis, AuditLog } from './api/simple-client'
+import { AnalyticsDashboard } from './components/analytics-dashboard'
+import { RankingsDashboard } from './components/rankings-dashboard'
+import { PlatformChangelog } from './components/platform-changelog'
+import { WeeklyReport } from './components/weekly-report'
 import { WebhookLogView } from './components/webhook-log-view'
 import { ArenaPage } from './components/arena-page'
 import { SkillRating } from './components/skill-rating'
@@ -451,434 +455,62 @@ function SearchAnalysisPanel({ data }: { data: SearchAnalysis | undefined }) {
   )
 }
 
-// 运营驾驶舱主组件
+// 运营驾驶舱主组件 - 使用新的 AnalyticsDashboard 和 RankingsDashboard
 function StatsView() {
-  const [stats, setStats] = useState<StatsData | null>(null)
-  const [kpi, setKpi] = useState<KpiData | null>(null)
-  const [trend, setTrend] = useState<TrendData | null>(null)
-  const [realtime, setRealtime] = useState<RealtimeEvent[]>([])
-  const [searchAnalysis, setSearchAnalysis] = useState<SearchAnalysis | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | 'total'>('week')
-  const [regionRankings, setRegionRankings] = useState<any[]>([])
-  const [centerRankings, setCenterRankings] = useState<any[]>([])
-  const [combinedRankings, setCombinedRankings] = useState<any[]>([])
-  const [rankingMetric, setRankingMetric] = useState<'publishes' | 'downloads'>('publishes')
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const [statsRes, kpiRes, trendRes, realtimeRes, searchRes, regionRes, centerRes, combinedRes] = await Promise.all([
-          getStats(),
-          getKpi(),
-          getTrend(timeRange === 'today' ? 1 : timeRange === 'week' ? 7 : 30),
-          getRealtimeEvents(15),
-          getSearchAnalysis(7),
-          getRegionRankings(rankingMetric, 10),
-          getCenterRankings(rankingMetric, 10),
-          getCombinedRankings(rankingMetric, 20),
-        ])
-        setStats(statsRes.data)
-        setKpi(kpiRes.data)
-        setTrend(trendRes.data)
-        setRealtime(realtimeRes.data || [])
-        setSearchAnalysis(searchRes.data)
-        setRegionRankings(regionRes.data?.rankings || [])
-        setCenterRankings(centerRes.data?.rankings || [])
-        setCombinedRankings(combinedRes.data?.rankings || [])
-      } catch (err) {
-        console.error('加载统计失败', err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    load()
-
-    // 实时活动流轮询
-    const interval = setInterval(async () => {
-      try {
-        const res = await getRealtimeEvents(15)
-        setRealtime(res.data || [])
-      } catch (e) {
-        // ignore
-      }
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }, [timeRange, rankingMetric])
-
-  if (isLoading) {
-    return (
-      <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto"></div>
-        <p className="mt-4 text-gray-500">加载运营数据...</p>
-      </div>
-    )
-  }
-
-  const kpiData = kpi?.[timeRange === 'week' ? 'this_week' : timeRange === 'month' ? 'this_month' : timeRange === 'total' ? 'total' : 'today'] || kpi?.today
-  const downloadSorted = stats ? [...stats.skills].sort((a, b) => b.downloads - a.downloads).slice(0, 10) : []
-  const devSorted = stats ? [...stats.developers].sort((a, b) => b.count - a.count).slice(0, 10) : []
+  const [activeTab, setActiveTab] = useState<'analytics' | 'rankings' | 'changelog' | 'weekly'>('analytics')
 
   return (
     <div className="space-y-6">
-      {/* 头部 */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-4">
+      {/* 子页签导航 */}
+      <div className="flex items-center justify-between py-4 border-b border-gray-200">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">随航守卫 运营驾驶舱</h2>
-          <p className="text-sm text-gray-500 mt-1">实时监控技能市场运营数据</p>
+          <h2 className="text-2xl font-bold text-gray-900">数据展示中心</h2>
+          <p className="text-sm text-gray-500 mt-1">运营数据与评奖排名</p>
         </div>
-        <div className="flex bg-gray-100 rounded-lg p-1">
-          {(['today', 'week', 'month', 'total'] as const).map(r => (
-            <button
-              key={r}
-              onClick={() => setTimeRange(r)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                timeRange === r ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {r === 'today' ? '今日' : r === 'week' ? '本周' : r === 'month' ? '本月' : '总计'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 平台累计概览 */}
-      {stats?.overview && (
-        <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
-            <span>📊</span> 平台累计数据
-          </h3>
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-            {[
-              { label: '技能总数', value: stats.overview.skills_total, icon: '📦', color: 'bg-emerald-500' },
-              { label: '版本总数', value: stats.overview.versions_total, icon: '🏷', color: 'bg-violet-500' },
-              { label: '作者人数', value: stats.overview.authors_total, icon: '👤', color: 'bg-orange-500' },
-              { label: '部门覆盖', value: stats.overview.departments_total, icon: '🏢', color: 'bg-blue-500' },
-              { label: '标签种类', value: stats.overview.tags_total, icon: '🏷', color: 'bg-pink-500' },
-              { label: '待审核', value: stats.overview.pending_total, icon: '⏳', color: 'bg-amber-500' },
-            ].map(item => (
-              <div key={item.label} className="text-center">
-                <div className={`w-10 h-10 rounded-lg ${item.color} flex items-center justify-center text-white text-lg mx-auto mb-2`}>
-                  {item.icon}
-                </div>
-                <div className="text-xl font-bold text-gray-900">{item.value}</div>
-                <div className="text-xs text-gray-500">{item.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* KPI 卡片 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <KpiCard title="技能发布（总计）" value={kpiData?.skills_total || 0} icon="📦" color="bg-emerald-500" />
-        <KpiCard title="下载次数（总计）" value={kpiData?.downloads || 0} icon="⬇" color="bg-pink-500" />
-        <KpiCard title="浏览次数（总计）" value={kpiData?.views || 0} icon="👁" color="bg-purple-500" />
-        <KpiCard title="搜索次数（总计）" value={kpiData?.searches || 0} icon="🔍" color="bg-blue-500" />
-        <KpiCard title="活跃用户（总计）" value={kpiData?.unique_users || 0} icon="👤" color="bg-orange-500" />
-      </div>
-
-      {/* 趋势图 + 活动流 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white text-sm">📈</span>
-              趋势分析
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TrendLineChart data={trend || undefined} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-teal-500 flex items-center justify-center text-white text-sm">⚡</span>
-              实时活动
-              <span className="ml-auto flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ActivityStream events={realtime} />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 排行榜 + 区域分布 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center text-white text-sm">⬇</span>
-              技能下载排行榜
-            </CardTitle>
-          </CardHeader>
-          <CardContent><RankBar items={downloadSorted} valueKey="downloads" labelKey="name" colorIndex={0} /></CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white text-sm">🏢</span>
-              区域上传分布
-            </CardTitle>
-          </CardHeader>
-          <CardContent><RegionBarChart items={stats?.regions || []} /></CardContent>
-        </Card>
-      </div>
-
-      {/* 搜索分析 + 个人排行 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm">🔍</span>
-              搜索分析
-            </CardTitle>
-          </CardHeader>
-          <CardContent><SearchAnalysisPanel data={searchAnalysis || undefined} /></CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center text-white text-sm">👤</span>
-              个人上传排行榜
-            </CardTitle>
-          </CardHeader>
-          <CardContent><RankBar items={devSorted} valueKey="count" labelKey="name" colorIndex={3} /></CardContent>
-        </Card>
-      </div>
-
-      {/* 大区与中心排行榜（排除数智中心） */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <span>🏆</span> 大区与中心排行榜（排除数智中心）
-          </h3>
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            {(['publishes', 'downloads'] as const).map(m => (
-              <button
-                key={m}
-                onClick={() => setRankingMetric(m)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  rankingMetric === m ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {m === 'publishes' ? '发布量' : '下载量'}
-              </button>
-            ))}
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* 各大区排行榜 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white text-sm">🏢</span>
-                各大区排行榜
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {regionRankings.map((region, index) => (
-                  <div key={region.region_id} className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      index === 0 ? 'bg-yellow-100 text-yellow-700' :
-                      index === 1 ? 'bg-gray-100 text-gray-700' :
-                      index === 2 ? 'bg-orange-100 text-orange-700' :
-                      'bg-gray-50 text-gray-500'
-                    }`}>
-                      {index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-900">{region.region_name}</span>
-                        <span className="text-sm font-bold text-gray-900">
-                          {rankingMetric === 'publishes' ? region.publishes : region.downloads}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2">
-                        <div 
-                          className="bg-gradient-to-r from-emerald-500 to-teal-500 h-2 rounded-full transition-all"
-                          style={{ 
-                            width: `${Math.max(
-                              regionRankings[0]?.[rankingMetric] > 0 
-                                ? (region[rankingMetric] / regionRankings[0][rankingMetric]) * 100 
-                                : 0, 
-                              5
-                            )}%` 
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {regionRankings.length === 0 && (
-                  <div className="text-center text-gray-400 py-4">暂无数据</div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 职能中心排行榜 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-sm">🏛</span>
-                职能中心排行榜
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {centerRankings.map((center, index) => (
-                  <div key={center.center_id} className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      index === 0 ? 'bg-yellow-100 text-yellow-700' :
-                      index === 1 ? 'bg-gray-100 text-gray-700' :
-                      index === 2 ? 'bg-orange-100 text-orange-700' :
-                      'bg-gray-50 text-gray-500'
-                    }`}>
-                      {index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-900">{center.center_name}</span>
-                        <span className="text-sm font-bold text-gray-900">
-                          {rankingMetric === 'publishes' ? center.publishes : center.downloads}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2">
-                        <div 
-                          className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all"
-                          style={{ 
-                            width: `${Math.max(
-                              centerRankings[0]?.[rankingMetric] > 0 
-                                ? (center[rankingMetric] / centerRankings[0][rankingMetric]) * 100 
-                                : 0, 
-                              5
-                            )}%` 
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {centerRankings.length === 0 && (
-                  <div className="text-center text-gray-400 py-4">暂无数据</div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex bg-gray-100 rounded-lg p-1 flex-wrap gap-1">
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'analytics' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📊 运营看板
+          </button>
+          <button
+            onClick={() => setActiveTab('rankings')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'rankings' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            🏆 评奖看板
+          </button>
+          <button
+            onClick={() => setActiveTab('changelog')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'changelog' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📝 平台迭代
+          </button>
+          <button
+            onClick={() => setActiveTab('weekly')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'weekly' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📅 运营周报
+          </button>
         </div>
       </div>
 
-      {/* 融合排行榜（各大区 + 职能中心） */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm">🏆</span>
-            融合排行榜（各大区 + 职能中心）
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {combinedRankings.map((item, index) => (
-              <div key={item.id} className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                  index === 0 ? 'bg-yellow-100 text-yellow-700' :
-                  index === 1 ? 'bg-gray-100 text-gray-700' :
-                  index === 2 ? 'bg-orange-100 text-orange-700' :
-                  'bg-gray-50 text-gray-500'
-                }`}>
-                  {index + 1}
-                </div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-center mb-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">{item.name}</span>
-                      <span className={`px-2 py-0.5 rounded text-xs ${
-                        item.type === 'region' 
-                          ? 'bg-emerald-100 text-emerald-700' 
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
-                        {item.type_label}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-gray-500">
-                        发布: <span className="font-medium text-gray-700">{item.publishes}</span>
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        下载: <span className="font-medium text-gray-700">{item.downloads}</span>
-                      </span>
-                      <span className="text-xs text-purple-500 bg-purple-50 px-2 py-0.5 rounded">
-                        得分: {item.score}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div 
-                      className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all"
-                      style={{ 
-                        width: `${Math.max(
-                          combinedRankings[0]?.score > 0 
-                            ? (item.score / combinedRankings[0].score) * 100 
-                            : 0, 
-                          5
-                        )}%` 
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-            {combinedRankings.length === 0 && (
-              <div className="text-center text-gray-400 py-4">暂无数据</div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 原有补充卡片 */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {stats.centers && stats.centers.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm">🏛</span>
-                  职能中心上传分布
-                </CardTitle>
-              </CardHeader>
-              <CardContent><DonutChart items={stats.centers} /></CardContent>
-            </Card>
-          )}
-
-          {stats.datacenters && stats.datacenters.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm">🖥</span>
-                  数据中心上传分布
-                </CardTitle>
-              </CardHeader>
-              <CardContent><RankBar items={stats.datacenters.slice(0, 10)} valueKey="count" labelKey="name" colorIndex={1} /></CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+      {/* 根据页签显示不同内容 */}
+      {activeTab === 'analytics' && <AnalyticsDashboard />}
+      {activeTab === 'rankings' && <RankingsDashboard />}
+      {activeTab === 'changelog' && <PlatformChangelog />}
+      {activeTab === 'weekly' && <WeeklyReport />}
     </div>
   )
 }
-
 // 密码验证弹窗
 function AdminLoginDialog({ isOpen, onLogin, onClose }: { isOpen: boolean; onLogin: (token: string) => void; onClose: () => void }) {
   const [password, setPassword] = useState('')

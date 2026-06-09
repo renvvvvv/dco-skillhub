@@ -14,7 +14,7 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from collections import Counter
 
-from app.config import STORAGE_DIR, MAX_FILE_SIZE, QUICK_APPROVE_TOKEN
+from app.config import STORAGE_DIR, MAX_FILE_SIZE, QUICK_APPROVE_TOKEN, BLOCKED_IPS
 from app.timezone_utils import get_beijing_time, get_beijing_date, get_beijing_datetime
 from app.database import (
     skills_db,
@@ -58,6 +58,7 @@ from app.events import (
 from app.webhook_logs import WebhookLog, WebhookLogService
 from app.notifier import FeishuNotifier
 from app.report_builder import DailyReportBuilder, WeeklyReportBuilder, _calc_trend
+from app.events import get_events_range, get_event_dates
 from app.metrics import (
     get_kpi_summary,
     get_trend_data,
@@ -274,6 +275,30 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # ============ API 路由 ============
 
 
+def _get_filtered_stats():
+    """从事件日志获取过滤后的下载量和浏览量统计"""
+    skill_downloads = Counter()
+    skill_views = Counter()
+
+    event_dates = get_event_dates()
+    for date in event_dates:
+        events = get_events_range(date, date)
+        for event in events:
+            ip = event.get("ip", "")
+            if ip in BLOCKED_IPS:
+                continue
+            etype = event.get("type")
+            slug = event.get("metadata", {}).get("slug", "")
+            if not slug:
+                continue
+            if etype == "skill.download":
+                skill_downloads[slug] += 1
+            elif etype == "skill.view":
+                skill_views[slug] += 1
+
+    return skill_downloads, skill_views
+
+
 @app.get("/api/skills")
 def list_skills(
     page: int = Query(0, ge=0),
@@ -281,7 +306,7 @@ def list_skills(
     tag: str = Query(None),
     tags: str = Query(None),
 ):
-    """获取技能列表"""
+    """获取技能列表（使用过滤后的下载量和浏览量）"""
     data = skills_db.read()
     skills = data.get("skills", [])
 
@@ -310,6 +335,15 @@ def list_skills(
             s for s in skills if any(t in (s.get("tags") or []) for t in filter_tags)
         ]
 
+    # 获取过滤后的统计数据
+    skill_downloads, skill_views = _get_filtered_stats()
+
+    # 更新技能数据中的下载量和浏览量
+    for s in skills:
+        slug = s.get("slug", "")
+        s["download_count"] = skill_downloads.get(slug, 0)
+        s["view_count"] = skill_views.get(slug, 0)
+
     # 排序（按创建时间倒序）
     skills.sort(key=lambda x: x.get("created_at", ""), reverse=True)
 
@@ -333,7 +367,7 @@ def list_skills(
 
 @app.get("/api/skills/{slug}")
 def get_skill(slug: str):
-    """获取技能详情"""
+    """获取技能详情（使用过滤后的下载量和浏览量）"""
     data = skills_db.read()
     skill = next((s for s in data.get("skills", []) if s["slug"] == slug), None)
 
@@ -343,6 +377,11 @@ def get_skill(slug: str):
     # 向后兼容
     if "status" not in skill:
         skill["status"] = "approved"
+
+    # 获取过滤后的统计数据
+    skill_downloads, skill_views = _get_filtered_stats()
+    skill["download_count"] = skill_downloads.get(slug, 0)
+    skill["view_count"] = skill_views.get(slug, 0)
 
     # 获取版本
     versions = get_skill_versions(skill["id"])
@@ -1013,6 +1052,9 @@ def get_stats():
     for date in event_dates:
         events = get_events_range(date, date)
         for event in events:
+            # 跳过黑名单IP的事件
+            if event.get("ip", "") in BLOCKED_IPS:
+                continue
             if event.get("type") == "skill.download":
                 slug = event.get("metadata", {}).get("slug", "")
                 if slug:
@@ -1022,7 +1064,7 @@ def get_stats():
                 if slug:
                     skill_views[slug] += 1
 
-    # 技能下载/浏览排行（使用日志数据）
+    # 技能下载/浏览排行（使用日志数据，已过滤黑名单IP）
     skill_stats = [
         {
             "name": s.get("name", ""),
@@ -1160,6 +1202,11 @@ def get_kpi():
             for event in events:
                 user = event.get("user", "")
                 ip = event.get("ip", "")
+
+                # 跳过黑名单IP的事件
+                if ip in BLOCKED_IPS:
+                    continue
+
                 etype = event.get("type")
 
                 if user:
@@ -1248,9 +1295,13 @@ def get_realtime(limit: int = Query(20, ge=1, le=100)):
     """获取实时活动流"""
     events = get_realtime_events(limit)
 
-    # 格式化事件为前端友好的格式
+    # 格式化事件为前端友好的格式（过滤黑名单IP）
     formatted = []
     for e in events:
+        # 跳过黑名单IP的事件
+        if e.get("ip", "") in BLOCKED_IPS:
+            continue
+
         meta = e.get("metadata", {})
         event_type = e["type"]
 
@@ -1301,6 +1352,9 @@ def get_search_analysis(days: int = Query(7, ge=1, le=30)):
     zero_total = 0
 
     for e in events:
+        # 跳过黑名单IP的搜索事件
+        if e.get("ip", "") in BLOCKED_IPS:
+            continue
         meta = e.get("metadata", {})
         q = meta.get("query", "")
         queries[q] += 1
@@ -2937,6 +2991,9 @@ def get_region_rankings(
     skills = data.get("skills", [])
     approved_skills = [s for s in skills if s.get("status") == "approved"]
 
+    # 获取过滤后的统计数据
+    skill_downloads, _ = _get_filtered_stats()
+
     # 初始化各大区统计
     region_stats = {}
     for region_id, region_info in IDC_REGIONS.items():
@@ -2958,7 +3015,7 @@ def get_region_rankings(
         if region_id and region_id != "hq" and region_id in region_stats:
             region_stats[region_id]["publishes"] += 1
             region_stats[region_id]["downloads"] += int(
-                skill.get("download_count", 0) or 0
+                skill_downloads.get(skill.get("slug", ""), 0)
             )
             region_stats[region_id]["skills"].append(skill.get("name"))
 
@@ -2998,6 +3055,9 @@ def get_center_rankings(
     skills = data.get("skills", [])
     approved_skills = [s for s in skills if s.get("status") == "approved"]
 
+    # 获取过滤后的统计数据
+    skill_downloads, _ = _get_filtered_stats()
+
     # 初始化各职能中心统计（排除数智中心）
     center_stats = {}
     for center_id, center_info in IDC_CENTERS.items():
@@ -3020,7 +3080,7 @@ def get_center_rankings(
         if center_id and center_id != "hq-数智" and center_id in center_stats:
             center_stats[center_id]["publishes"] += 1
             center_stats[center_id]["downloads"] += int(
-                skill.get("download_count", 0) or 0
+                skill_downloads.get(skill.get("slug", ""), 0)
             )
             center_stats[center_id]["skills"].append(skill.get("name"))
 
@@ -3058,6 +3118,9 @@ def get_combined_rankings(
     data = skills_db.read()
     skills = data.get("skills", [])
     approved_skills = [s for s in skills if s.get("status") == "approved"]
+
+    # 获取过滤后的统计数据
+    skill_downloads, _ = _get_filtered_stats()
 
     # 初始化统计
     combined_stats = {}
@@ -3098,7 +3161,7 @@ def get_combined_rankings(
         if region_id and region_id != "hq" and region_id in combined_stats:
             combined_stats[region_id]["publishes"] += 1
             combined_stats[region_id]["downloads"] += int(
-                skill.get("download_count", 0) or 0
+                skill_downloads.get(skill.get("slug", ""), 0)
             )
             combined_stats[region_id]["skills"].append(skill.get("name"))
 
@@ -3106,7 +3169,7 @@ def get_combined_rankings(
         if center_id and center_id != "hq-数智" and center_id in combined_stats:
             combined_stats[center_id]["publishes"] += 1
             combined_stats[center_id]["downloads"] += int(
-                skill.get("download_count", 0) or 0
+                skill_downloads.get(skill.get("slug", ""), 0)
             )
             combined_stats[center_id]["skills"].append(skill.get("name"))
 
@@ -3850,6 +3913,268 @@ def get_skills_with_associations():
         )
 
     return {"success": True, "data": result}
+
+
+# ========== 运营数据分析 API ==========
+
+
+@app.get("/api/analytics/overview")
+def get_analytics_overview_api(
+    start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="结束日期 YYYY-MM-DD"),
+):
+    """获取运营概览数据（已过滤黑名单IP）"""
+    from app.analytics import get_analytics_overview
+
+    return {"success": True, "data": get_analytics_overview(start_date, end_date)}
+
+
+@app.get("/api/analytics/trend")
+def get_analytics_trend_api(
+    start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="结束日期 YYYY-MM-DD"),
+):
+    """获取趋势数据"""
+    from app.analytics import get_analytics_trend
+
+    return {"success": True, "data": get_analytics_trend(start_date, end_date)}
+
+
+@app.get("/api/analytics/skills")
+def get_analytics_skills_api(
+    start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="结束日期 YYYY-MM-DD"),
+    sort_by: str = Query("downloads", description="排序字段: downloads|views"),
+    limit: int = Query(10, description="返回数量"),
+):
+    """获取技能排行"""
+    from app.analytics import get_skill_rankings
+
+    return {
+        "success": True,
+        "data": get_skill_rankings(start_date, end_date, sort_by, limit),
+    }
+
+
+@app.get("/api/analytics/search")
+def get_analytics_search_api(
+    start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="结束日期 YYYY-MM-DD"),
+):
+    """获取搜索分析"""
+    from app.analytics import get_search_analysis
+
+    return {"success": True, "data": get_search_analysis(start_date, end_date)}
+
+
+@app.get("/api/analytics/heatmap")
+def get_analytics_heatmap_api(
+    start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
+    end_date: str = Query(..., description="结束日期 YYYY-MM-DD"),
+    metric: str = Query(
+        "downloads", description="指标: downloads|views|searches|publishes"
+    ),
+):
+    """获取热力图数据"""
+    from app.analytics import get_heatmap_data
+
+    return {"success": True, "data": get_heatmap_data(start_date, end_date, metric)}
+
+
+@app.get("/api/analytics/day-detail")
+def get_analytics_day_detail_api(
+    date: str = Query(..., description="日期 YYYY-MM-DD"),
+    metric: str = Query("downloads", description="指标: downloads|views|searches"),
+):
+    """获取某一天详细数据"""
+    from app.analytics import get_day_detail
+
+    return {"success": True, "data": get_day_detail(date, metric)}
+
+
+# ========== 评奖数据 API（排除数智中心）==========
+
+
+@app.get("/api/rankings/departments")
+def get_department_rankings_api(
+    metric: str = Query(
+        "composite", description="排序指标: publishes|downloads|composite"
+    ),
+    limit: int = Query(10, description="返回数量"),
+):
+    """获取部门排行榜（排除数智中心）"""
+    from app.analytics import get_department_rankings
+
+    return {"success": True, "data": get_department_rankings(metric, limit)}
+
+
+@app.get("/api/rankings/developers")
+def get_developer_rankings_api(
+    metric: str = Query(
+        "composite", description="排序指标: publishes|downloads|composite"
+    ),
+    limit: int = Query(10, description="返回数量"),
+):
+    """获取个人排行榜（排除数智中心人员）"""
+    from app.analytics import get_developer_rankings
+
+    return {"success": True, "data": get_developer_rankings(metric, limit)}
+
+
+@app.get("/api/rankings/centers")
+def get_center_rankings_api(
+    metric: str = Query(
+        "composite", description="排序指标: publishes|downloads|composite"
+    ),
+):
+    """获取职能中心排行榜（排除数智中心）"""
+    from app.analytics import get_center_rankings_exclude_zhishu
+
+    return {"success": True, "data": get_center_rankings_exclude_zhishu(metric)}
+
+
+@app.get("/api/rankings/regions")
+def get_region_rankings_api(
+    metric: str = Query(
+        "publishes", description="排序指标: publishes|downloads|composite"
+    ),
+):
+    """获取区域排行榜（排除数智中心）"""
+    from app.analytics import get_region_rankings_exclude_zhishu
+
+    return {"success": True, "data": get_region_rankings_exclude_zhishu(metric)}
+
+
+@app.get("/api/changelog")
+def get_changelog():
+    """获取平台迭代日志（预定义版本记录）"""
+    versions = [
+        {
+            "version": "v1.5.0",
+            "date": "2026-06-08",
+            "description": "数据展示中心重构",
+            "isLatest": True,
+            "changes": [
+                "重构运营数据看板，支持自定义时间范围",
+                "新增评奖看板，排除数智中心参与评比",
+                "新增运营热力图，支持按天查看数据",
+                "新增平台迭代日志页面",
+                "新增运营周报历史页面",
+                "优化趋势分析图表为平滑曲线",
+            ],
+        },
+        {
+            "version": "v1.4.0",
+            "date": "2026-05-20",
+            "description": "排行榜与通知优化",
+            "isLatest": False,
+            "changes": [
+                "新增融合排行榜（各大区+职能中心）",
+                "优化周报日报展示",
+                "飞书Webhook通知系统",
+                "管理后台日志查看",
+            ],
+        },
+        {
+            "version": "v1.3.0",
+            "date": "2026-05-01",
+            "description": "首页与交互优化",
+            "isLatest": False,
+            "changes": [
+                "全新首页设计",
+                "小智优选功能",
+                "Skill擂台模块",
+                "专家评审系统优化",
+            ],
+        },
+        {
+            "version": "v1.2.0",
+            "date": "2026-04-25",
+            "description": "运营与筛选功能",
+            "isLatest": False,
+            "changes": [
+                "运营驾驶舱",
+                "搜索筛选功能",
+                "事件埋点系统",
+                "两级标签系统",
+            ],
+        },
+        {
+            "version": "v1.1.0",
+            "date": "2026-04-18",
+            "description": "管理后台功能",
+            "isLatest": False,
+            "changes": [
+                "管理员审核工作流",
+                "审计日志",
+                "技能状态管理",
+                "多格式归档支持",
+            ],
+        },
+        {
+            "version": "v1.0.0",
+            "date": "2026-04-14",
+            "description": "项目初始化",
+            "isLatest": False,
+            "changes": [
+                "DCO SkillHub 项目初始化",
+                "基础技能管理功能",
+                "文件上传下载",
+            ],
+        },
+    ]
+
+    return {"success": True, "data": versions}
+
+
+@app.get("/api/analytics/weekly-report")
+def get_analytics_weekly_report():
+    """获取运营周报历史数据"""
+    from app.analytics import get_analytics_overview
+    from datetime import datetime, timedelta
+
+    try:
+        # 从项目开始日期（2026-04-14）到现在，按周生成报告
+        start_date = datetime(2026, 4, 14)
+        end_date = datetime.now()
+
+        weekly_reports = []
+        current_week_start = start_date
+        week_num = 1
+
+        while current_week_start < end_date:
+            current_week_end = current_week_start + timedelta(days=6)
+            if current_week_end > end_date:
+                current_week_end = end_date
+
+            week_start_str = current_week_start.strftime("%Y-%m-%d")
+            week_end_str = current_week_end.strftime("%Y-%m-%d")
+
+            try:
+                overview = get_analytics_overview(week_start_str, week_end_str)
+                weekly_reports.append(
+                    {
+                        "week_range": f"第{week_num}周",
+                        "date_range": f"{week_start_str} ~ {week_end_str}",
+                        "downloads": overview.get("downloads", 0),
+                        "views": overview.get("views", 0),
+                        "searches": overview.get("searches", 0),
+                        "publishes": overview.get("publishes", 0),
+                        "unique_users": overview.get("unique_users", 0),
+                    }
+                )
+            except:
+                pass
+
+            current_week_start = current_week_end + timedelta(days=1)
+            week_num += 1
+
+        # 倒序排列，最新的在前面
+        weekly_reports.reverse()
+
+        return {"success": True, "data": weekly_reports}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 if __name__ == "__main__":

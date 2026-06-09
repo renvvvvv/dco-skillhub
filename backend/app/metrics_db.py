@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from collections import defaultdict
 
-from app.config import DATA_DIR
+from app.config import DATA_DIR, BLOCKED_IPS
 
 # 数据文件路径
 METRICS_EVENTS_FILE = DATA_DIR / "metrics_events.json"
@@ -54,6 +54,10 @@ class MetricsDatabase:
         ip: str = None,
     ) -> dict:
         """记录事件"""
+        # 过滤黑名单IP
+        if ip in BLOCKED_IPS:
+            return {}
+
         db = self._read(self.events_file)
         events = db.get("data", [])
 
