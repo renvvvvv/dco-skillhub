@@ -15,6 +15,11 @@ from datetime import datetime, timedelta, timezone
 from collections import Counter
 
 from app.config import STORAGE_DIR, MAX_FILE_SIZE, QUICK_APPROVE_TOKEN, BLOCKED_IPS
+from app.sensitive_check import (
+    check_skill_md_sensitive,
+    validate_skill_metadata,
+    contains_chinese,
+)
 from app.timezone_utils import get_beijing_time, get_beijing_date, get_beijing_datetime
 from app.database import (
     skills_db,
@@ -445,9 +450,17 @@ async def create_skill(
         with open(temp_path, "wb") as f:
             shutil.copyfileobj(skillZip.file, f)
 
-        # 检查文件大小
-        if temp_path.stat().st_size > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail="File too large")
+        # 检查文件大小（3MB限制）
+        file_size = temp_path.stat().st_size
+        if file_size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "FILE_TOO_LARGE",
+                    "message": f"文件大小 {file_size / 1024 / 1024:.2f}MB，超过 3MB 限制",
+                    "max_size": "3MB",
+                },
+            )
 
         # 解析 skill.md
         skill_info = extract_skill_md(temp_path)
@@ -456,6 +469,32 @@ async def create_skill(
         final_name = skillName.strip() or skill_info["name"]
         final_description = skillDescription.strip() or skill_info["description"]
         final_readme = skill_info["readme_content"]
+
+        # 验证技能元数据（中文名称、简介长度）
+        metadata_errors = validate_skill_metadata(final_name, final_description)
+        if metadata_errors:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "VALIDATION_FAILED",
+                    "message": "技能信息校验失败",
+                    "errors": [
+                        {"type": "metadata", "message": err} for err in metadata_errors
+                    ],
+                },
+            )
+
+        # 全量脱敏检查
+        sensitive_issues = check_skill_md_sensitive(skill_info["readme_content"])
+        if sensitive_issues:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "SENSITIVE_CONTENT_DETECTED",
+                    "message": "发现敏感信息，请脱敏后重新提交",
+                    "errors": sensitive_issues,
+                },
+            )
 
         # 生成 slug
         slug = generate_slug(final_name)

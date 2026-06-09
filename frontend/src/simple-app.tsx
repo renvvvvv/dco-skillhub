@@ -15,6 +15,7 @@ import { WeeklyPicksManager } from './components/weekly-picks-manager'
 import { QuickStartPage } from './components/quickstart/quickstart-page'
 import { ScenarioMapPage } from './components/quickstart/scenario-map-page'
 import { UploadZone } from './features/publish/upload-zone'
+import { validateSkillPackage, type ValidationResult } from './shared/lib/skill-validator'
 import { SearchBar } from './features/search/search-bar'
 import { Button } from './shared/ui/button'
 import { Input } from './shared/ui/input'
@@ -1335,6 +1336,8 @@ function 发布View({ onSuccess }: { onSuccess: () => void }) {
   const [tags, setTags] = useState<string[]>([])
   const [skillName, setSkillName] = useState('')
   const [skillDesc, setSkillDesc] = useState('')
+  const [securityReport, setSecurityReport] = useState<ValidationResult | null>(null)
+  const [showSecurityDialog, setShowSecurityDialog] = useState(false)
   
   function handleStaffSelect(staff: Staff) {
     setAuthorName(staff.name)
@@ -1365,6 +1368,27 @@ function 发布View({ onSuccess }: { onSuccess: () => void }) {
     if (!nameValue) { alert('请输入作者名称'); return }
     if (!skillName.trim()) { alert('技能名称不能为空'); return }
     
+    // 进行安全性验证
+    try {
+      const result = await validateSkillPackage(file)
+      setSecurityReport(result)
+      setShowSecurityDialog(true)
+      
+      if (!result.valid) {
+        // 有错误，只显示报告，不继续发布
+        return
+      }
+      // 通过验证，显示报告等待用户确认
+    } catch (err) {
+      console.error('验证失败:', err)
+      alert('文件验证失败: ' + (err as Error).message)
+    }
+  }
+  
+  async function confirmPublish() {
+    if (!file) return
+    
+    const nameValue = authorName.trim()
     const formData = new FormData()
     formData.append('skillZip', file)
     formData.append('authorName', nameValue)
@@ -1376,8 +1400,10 @@ function 发布View({ onSuccess }: { onSuccess: () => void }) {
     formData.append('tags', tags.join(','))
     formData.append('skillName', skillName.trim())
     formData.append('skillDescription', skillDesc.trim())
+    
     try {
       setIsSubmitting(true)
+      setShowSecurityDialog(false)
       await publishSkill(formData)
       // 刷新人员缓存，确保新人员下次能搜到
       refreshStaffCache()
@@ -1389,6 +1415,7 @@ function 发布View({ onSuccess }: { onSuccess: () => void }) {
       setIsSubmitting(false)
     }
   }
+  
   return (
     <Card className="max-w-2xl mx-auto">
       <CardHeader><CardTitle>发布 New Skill</CardTitle></CardHeader>
@@ -1418,6 +1445,120 @@ function 发布View({ onSuccess }: { onSuccess: () => void }) {
           
           <div className="flex space-x-4 pt-4"><Button type="submit" disabled={isSubmitting} className="flex-1 bg-gradient-to-r from-pink-500 to-purple-500">{isSubmitting ? '发布中...' : '发布 Skill'}</Button></div>
         </form>
+        
+        {/* 安全性验证报告弹窗 */}
+        {showSecurityDialog && securityReport && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6">
+                <h3 className={`text-lg font-bold mb-4 ${securityReport.valid ? 'text-green-700' : 'text-red-700'}`}>
+                  {securityReport.valid ? '安全性验证报告' : '发布检查未通过'}
+                </h3>
+                
+                {/* 文件信息 */}
+                <div className="bg-gray-50 p-3 rounded-lg mb-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">文件信息</h4>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <p>文件名：{file?.name}</p>
+                    <p>大小：{((securityReport.fileSize || 0) / 1024).toFixed(1)} KB</p>
+                    {securityReport.name && <p>技能名称：{securityReport.name}</p>}
+                    {securityReport.description && (
+                      <p>简介：{securityReport.description.length} 字</p>
+                    )}
+                  </div>
+                </div>
+                
+                {/* 检查结果 */}
+                {securityReport.valid ? (
+                  <div className="bg-green-50 border border-green-200 p-4 rounded-lg mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="font-semibold text-green-700">所有检查通过</span>
+                    </div>
+                    <ul className="text-sm text-green-600 space-y-1 ml-7">
+                      <li>技能名称包含中文</li>
+                      <li>简介长度符合要求（{securityReport.description?.length || 0} / 200 字）</li>
+                      <li>未发现敏感信息</li>
+                      <li>文件大小符合要求</li>
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="space-y-2 mb-4">
+                    <p className="text-sm text-red-600 font-medium">
+                      发现 {securityReport.errors.length} 个问题，请修改后重新上传：
+                    </p>
+                    {securityReport.errors.map((error, index) => (
+                      <div
+                        key={index}
+                        className={`p-3 rounded-lg border ${
+                          error.level === 'high'
+                            ? 'bg-red-50 border-red-200'
+                            : error.level === 'medium'
+                            ? 'bg-yellow-50 border-yellow-200'
+                            : 'bg-blue-50 border-blue-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                            error.level === 'high'
+                              ? 'bg-red-100 text-red-700'
+                              : error.level === 'medium'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {error.type === 'name' && '名称'}
+                            {error.type === 'description' && '简介'}
+                            {error.type === 'sensitive' && '敏感信息'}
+                            {error.type === 'size' && '文件大小'}
+                          </span>
+                          {error.level && (
+                            <span className={`text-xs ${
+                              error.level === 'high' ? 'text-red-600' : 'text-yellow-600'
+                            }`}>
+                              {error.level === 'high' ? '高风险' : '中风险'}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm mt-1 text-gray-700">{error.message}</p>
+                        {error.line && (
+                          <p className="text-xs text-gray-500 mt-1">第 {error.line} 行</p>
+                        )}
+                        {error.content && (
+                          <p className="text-xs font-mono text-gray-600 mt-1 bg-gray-100 p-1 rounded truncate">
+                            {error.content}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* 按钮 */}
+                <div className="flex justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowSecurityDialog(false)}
+                  >
+                    {securityReport.valid ? '取消' : '我知道了'}
+                  </Button>
+                  {securityReport.valid && (
+                    <Button
+                      type="button"
+                      onClick={confirmPublish}
+                      disabled={isSubmitting}
+                      className="bg-gradient-to-r from-pink-500 to-purple-500"
+                    >
+                      {isSubmitting ? '发布中...' : '确认发布'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
