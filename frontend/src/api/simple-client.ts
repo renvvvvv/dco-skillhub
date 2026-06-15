@@ -522,42 +522,168 @@ export async function getCombinedRankings(
   return response.json();
 }
 
+// 前端黑名单IP（与后端保持一致，用于过滤可疑IP）
+const BLOCKED_IPS = new Set([
+  "111.56.183.77",
+  "60.31.150.220",
+  "39.154.197.229",
+  "106.35.221.81",
+  // 2026-06-11 可疑扫描IP
+  "60.31.143.234",
+  "1.25.47.6",
+  "110.19.124.223",
+  "39.154.199.120",
+  "1.25.31.186",
+  "39.154.211.115",
+  // 2026-06-10 可疑扫描IP
+  "1.181.123.124",
+  "220.195.74.35",
+  // 2026-06-09 可疑扫描IP
+  "36.102.133.223",
+  // 2026-06-12 可疑扫描IP
+  "14.17.105.142",
+  "14.18.237.12",
+  "111.55.25.223",
+  "222.222.126.121",
+  // 2026-06-13 可疑扫描IP
+  "218.4.137.98",
+]);
+
+// 获取原始事件数据并过滤
+async function getFilteredEvents(startDate: string, endDate: string): Promise<any[]> {
+  // 获取原始事件数据
+  const events: any[] = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateStr = d.toISOString().split('T')[0];
+    try {
+      const response = await fetch(`${API_BASE}/events?date=${dateStr}&limit=10000`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data && Array.isArray(data.data)) {
+          events.push(...data.data);
+        }
+      }
+    } catch (e) {
+      console.error(`获取${dateStr}事件失败`, e);
+    }
+  }
+  
+  // 过滤黑名单IP
+  return events.filter(event => !event.ip || !BLOCKED_IPS.has(event.ip));
+}
+
+// 计算过滤后的统计数据
+function calculateStats(events: any[]): any {
+  const downloads = events.filter(e => e.type === 'skill.download').length;
+  const views = events.filter(e => e.type === 'skill.view').length;
+  const searches = events.filter(e => e.type === 'search').length;
+  const publishes = events.filter(e => e.type === 'skill.publish').length;
+  const uniqueUsers = new Set(events.filter(e => e.user).map(e => e.user)).size;
+  
+  return {
+    downloads,
+    views,
+    searches,
+    publishes,
+    unique_users: uniqueUsers
+  };
+}
+
+// 过滤事件数据中的可疑IP
+function filterBlockedIps(data: any): any {
+  if (!data) return data;
+  
+  // 如果是数组，过滤每个元素
+  if (Array.isArray(data)) {
+    return data.filter(item => {
+      if (item.ip && BLOCKED_IPS.has(item.ip)) return false;
+      if (item.events && Array.isArray(item.events)) {
+        item.events = item.events.filter((e: any) => !e.ip || !BLOCKED_IPS.has(e.ip));
+      }
+      return true;
+    });
+  }
+  
+  // 如果是对象，递归处理
+  if (typeof data === 'object') {
+    const result = { ...data };
+    
+    // 过滤事件数组
+    if (result.events && Array.isArray(result.events)) {
+      result.events = result.events.filter((e: any) => !e.ip || !BLOCKED_IPS.has(e.ip));
+    }
+    
+    // 过滤技能数组中的事件
+    if (result.skills && Array.isArray(result.skills)) {
+      result.skills = result.skills.map((skill: any) => {
+        if (skill.events && Array.isArray(skill.events)) {
+          return {
+            ...skill,
+            events: skill.events.filter((e: any) => !e.ip || !BLOCKED_IPS.has(e.ip))
+          };
+        }
+        return skill;
+      });
+    }
+    
+    return result;
+  }
+  
+  return data;
+}
+
 // ========== 运营数据分析 API ==========
 
 export async function getAnalyticsOverview(startDate: string, endDate: string): Promise<ApiResponse<any>> {
-  const response = await fetch(`${API_BASE}/analytics/overview?start_date=${startDate}&end_date=${endDate}`);
-  if (!response.ok) throw new Error('Failed to get analytics overview');
-  return response.json();
+  // 获取原始事件并计算过滤后的统计
+  const events = await getFilteredEvents(startDate, endDate);
+  const stats = calculateStats(events);
+  
+  return {
+    success: true,
+    data: {
+      ...stats,
+      period: `${startDate} ~ ${endDate}`
+    }
+  };
 }
 
 export async function getAnalyticsTrend(startDate: string, endDate: string): Promise<ApiResponse<any>> {
   const response = await fetch(`${API_BASE}/analytics/trend?start_date=${startDate}&end_date=${endDate}`);
   if (!response.ok) throw new Error('Failed to get analytics trend');
-  return response.json();
+  const data = await response.json();
+  return filterBlockedIps(data);
 }
 
 export async function getAnalyticsSkills(startDate: string, endDate: string, sortBy: string = 'downloads', limit: number = 10): Promise<ApiResponse<any>> {
   const response = await fetch(`${API_BASE}/analytics/skills?start_date=${startDate}&end_date=${endDate}&sort_by=${sortBy}&limit=${limit}`);
   if (!response.ok) throw new Error('Failed to get analytics skills');
-  return response.json();
+  const data = await response.json();
+  return filterBlockedIps(data);
 }
 
 export async function getAnalyticsSearch(startDate: string, endDate: string): Promise<ApiResponse<any>> {
   const response = await fetch(`${API_BASE}/analytics/search?start_date=${startDate}&end_date=${endDate}`);
   if (!response.ok) throw new Error('Failed to get analytics search');
-  return response.json();
+  const data = await response.json();
+  return filterBlockedIps(data);
 }
 
 export async function getAnalyticsHeatmap(startDate: string, endDate: string, metric: string = 'downloads'): Promise<ApiResponse<any>> {
   const response = await fetch(`${API_BASE}/analytics/heatmap?start_date=${startDate}&end_date=${endDate}&metric=${metric}`);
   if (!response.ok) throw new Error('Failed to get analytics heatmap');
-  return response.json();
+  const data = await response.json();
+  return filterBlockedIps(data);
 }
 
 export async function getAnalyticsDayDetail(date: string, metric: string = 'downloads'): Promise<ApiResponse<any>> {
   const response = await fetch(`${API_BASE}/analytics/day-detail?date=${date}&metric=${metric}`);
   if (!response.ok) throw new Error('Failed to get analytics day detail');
-  return response.json();
+  const data = await response.json();
+  return filterBlockedIps(data);
 }
 
 // ========== 评奖数据 API（排除数智中心）==========

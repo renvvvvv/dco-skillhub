@@ -24,7 +24,7 @@ def get_date_range(start_date: str, end_date: str) -> List[str]:
 
 
 def get_filtered_events(start_date: str, end_date: str) -> List[dict]:
-    """获取指定日期范围内已过滤的事件"""
+    """获取指定日期范围内已过滤的事件（排除黑名单IP）"""
     events = []
     for date in get_date_range(start_date, end_date):
         day_events = get_events_range(date, date)
@@ -35,7 +35,7 @@ def get_filtered_events(start_date: str, end_date: str) -> List[dict]:
 
 
 def get_analytics_overview(start_date: str, end_date: str) -> dict:
-    """获取运营概览数据"""
+    """获取运营概览数据（已过滤黑名单IP）"""
     events = get_filtered_events(start_date, end_date)
 
     downloads = sum(1 for e in events if e["type"] == "skill.download")
