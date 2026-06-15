@@ -7,8 +7,8 @@ export function PlatformChangelog() {
   const [filterType, setFilterType] = useState<string>('all');
 
   const filteredLogs = filterType === 'all' 
-    ? VERSION_LOGS 
-    : VERSION_LOGS.filter(log => log.type === filterType);
+    ? [...VERSION_LOGS].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    : VERSION_LOGS.filter(log => log.type === filterType).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const typeStats = {
     all: VERSION_LOGS.length,
